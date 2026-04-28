@@ -1,0 +1,794 @@
+---
+title: "Ejercicios de Clustering k-Means"
+author: "Jan Żurek y Guido D'Inverno"
+date: "04/2026"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+    toc: true
+    highlight: tango
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# Configuración global de los bloques de código
+knitr::opts_chunk$set(
+  include = TRUE,   # Muestra los gráficos y las tablas 
+  echo = TRUE,      # Muestra el código en el PDF
+  warning = FALSE,  # Oculta los mensajes de advertencia
+  message = FALSE   # Oculta los mensajes de carga
+)
+
+# =======================================================
+# 1. IMPORTACIÓN Y MANIPULACIÓN DE DATOS
+# =======================================================
+library(readxl)               # Lee e importa datos de archivos Excel (.xls y .xlsx)
+library(dplyr)                # Manipulación rápida de datasets (filtros, selecciones, agrupaciones)
+library(tidyr)                # Limpieza y reordenamiento de datos (funciones como pivot_longer/wider para datos "tidy")
+
+# =======================================================
+# 2. ESTADÍSTICAS DESCRIPTIVAS Y EXPLORATORIAS
+# =======================================================
+library(pastecs)              # Análisis espacial/temporal y estadísticas descriptivas básicas (ej. función stat.desc)
+library(modeest)              # Cálculo y estimación de la moda para datos univariados
+library(PerformanceAnalytics) # Herramientas avanzadas para el análisis de rendimiento/riesgo y matrices de correlación visuales
+
+# =======================================================
+# 3. VISUALIZACIÓN GRÁFICA
+# =======================================================
+library(graphics)             # Paquete base de R para gráficos estándar (plot, hist, barplot)
+library(ggplot2)              # Creación de gráficos avanzados y personalizables basados en la "Grammar of Graphics"
+library(GGally)               # Extensión de ggplot2 para combinar varios gráficos (ej. ggpairs para matrices de dispersión)
+library(patchwork)            # Permite combinar y organizar fácilmente varios gráficos ggplot2 en una sola imagen
+
+# =======================================================
+# 4. CORRELACIÓN Y ANÁLISIS DE REDES (NETWORK ANALYSIS)
+# =======================================================
+library(corrplot)             # Visualización gráfica y elegante de matrices de correlación
+library(polycor)              # Cálculo de matrices de correlaciones policóricas, tetracóricas y biseriales
+library(qgraph)               # Visualización de redes y modelos psicométricos (Network Analysis)
+library(igraph)               # Creación, manipulación y análisis de grafos y redes complejas
+
+# =======================================================
+# 5. PRUEBAS ESTADÍSTICAS, SUPUESTOS Y NORMALIDAD
+# =======================================================
+library(car)                  # "Companion to Applied Regression": pruebas de supuestos, ANOVA y transformación de datos
+library(nortest)              # Pruebas de normalidad univariadas para muestras complejas (ej. Anderson-Darling)
+library(mvtnorm)              # Cálculo de probabilidades y cuantiles para la distribución normal multivariante
+library(MVN)                  # Pruebas de normalidad multivariante y detección de valores atípicos (outliers) multivariantes
+library(mvnormtest)           # Extensión de la prueba de Shapiro-Wilk para la normalidad multivariante
+
+# =======================================================
+# 6. ANÁLISIS MULTIVARIANTE: PCA Y ANÁLISIS FACTORIAL
+# =======================================================
+library(psych)                # Funciones para psicometría: estadísticas, análisis factorial exploratorio (EFA) y PCA
+library(FactoMineR)           # Análisis multivariante exploratorio clásico (PCA, MCA, MFA)
+library(factoextra)           # Extracción y visualización elegante de los resultados de los modelos de FactoMineR
+library(GPArotation)          # Algoritmos de rotación para el análisis factorial (ej. varimax, oblimin)
+library(nFactors)             # Índices y reglas para determinar el número correcto de factores/componentes a extraer
+library(paran)                # Implementa el Análisis Paralelo de Horn para la elección del número de factores
+library(MVA)                  # Funciones y datasets relacionados con el análisis multivariante aplicado
+library(biotools)             # Herramientas para biometría y análisis estadísticos multivariantes aplicados
+
+# =======================================================
+# 7. CLUSTERING Y CLASIFICACIÓN
+# =======================================================
+library(cluster)              # Métodos y algoritmos básicos para el análisis de clústeres (k-means, jerárquico, PAM)
+library(NbClust)              # Proporciona decenas de índices para determinar el número óptimo de clústeres
+library(clValid)              # Validación estadística y biológica de resultados de clustering para decidir qué algoritmo usar
+library(dendextend)           # Creación, personalización visual y comparación de dendrogramas (árboles jerárquicos)
+
+# =======================================================
+# 8. CREACIÓN DE REPORTES Y FORMATEO DE TABLAS
+# =======================================================
+library(knitr)                # Generación de reportes dinámicos combinando código R y texto (Markdown/LaTeX)
+library(pander)               # Transforma objetos y salidas de R en tablas y textos formateados (Markdown) listos para reportes
+```
+
+
+
+# Ejercicio 1: Análisis Clustering de dataset 'estadisticas.txt'
+
+
+## 1.1. Análisis previos
+
+Antes de hacer un análisis de clúster, debemos verificar los datos recopilados y estandarizarlos para evitar que las variables medidas en diferentes escalas dominen el cálculo de distancias.
+
+```{r}
+#Primero procedemos a leer el fichero de datos
+
+datos_originales <-read.table("estadisticas.txt",sep="\t",header = T)  
+
+pander(head(datos_originales[, 1:5]))
+
+```
+
+Carga correctamente el fichero de datos.
+
+
+
+
+
+```{r}
+datos <- datos_originales[datos_originales$minutosjugados >= 100, ]
+
+# Usamos gsub para sustituir la coma por un punto antes de la conversión
+datos$tirosd3 <- as.numeric(gsub(",", ".", datos$tirosd3))
+datos$tirosd2 <- as.numeric(gsub(",", ".", datos$tirosd2))
+datos$tirosde1 <- as.numeric(gsub(",", ".", datos$tirosde1))
+
+
+# Verificación de valores faltantes
+print(sum(is.na(datos)))
+
+datos_cluster <- datos[, -(1:3)]
+
+datos_cluster[] <- lapply(datos_cluster, as.numeric)
+
+str(datos_cluster)
+
+```
+
+      No hay valores que falten 
+      
+      
+Hemos corregido los separadores y convertido en variables numéricas aquellas que antes eran categóricas.
+
+Hemos eliminado las variables que no nos interesan para el análisis de conglomerados.
+
+Hemos eliminado a los jugadores con menos de 100 minutos jugados; ahora tenemos 149 observaciones.
+
+
+
+
+
+Normalización de los datos 
+
+```{r}
+datoz <- scale(datos_cluster, center = TRUE, scale = TRUE)
+
+# Crea un dataframe di riepilogo
+riepilogo <- data.frame(
+  Media = round(colMeans(datoz), 3),
+  Dev_Std = apply(datoz, 2, sd)
+)
+
+pander(riepilogo)
+
+```
+
+
+Datos correctamente estandarizados (media=0, dev.st=1) para que todos tengan el mismo "peso".
+
+
+
+
+
+
+
+## 1.2. Selección del número de clústeres y clustering : 'PAM'
+
+
+Analicemos varios métodos para calcular el valor óptimo de k: empecemos por el 'PAM'
+
+
+```{r}
+
+rownames(datoz) <- datos$nombre
+
+fviz_nbclust(datoz, pam, method = "silhouette") + 
+  theme_classic()
+
+pam.res <- pam(datoz, 3)                     
+
+print(pam.res$medoids)
+                            
+```
+
+
+El PAM nos sugiere k = 3 grupos.
+
+
+
+Interpretación del «jugador típico» (el medoide) en los 3 grupos:
+
+- *Clúster 1 (ID 4 - Guillem Jou - )* : Todos los valores son muy negativos; son jugadores que anotan poco, juegan poco y tienen un impacto bajo en casi todas las estadísticas.
+
+- *Clúster 2 (ID 101 - Jeremy Senglin -)*: Tienen valores altos en asistencias (0,91), recuperaciones (0,87) y tiros de 3 (porcentaje de 3).
+Probablemente sean bases o bases-escoltas que dirigen el juego, anotan desde fuera pero tienen dificultades en el rebote ofensivo (-0,44).
+
+- *Clúster 3 (ID 92 - Tyson Pérez-)* : Dominan en rebotes totales (0,93) y tapones a favor (0,84), pero tienen promedios muy bajos en tiros desde fuera y en asistencias. 
+Estos son los clásicos pívots o aleros altos que trabajan bajo el aro.
+
+
+
+
+
+```{r}
+pander(pam.res$clusinfo)
+```
+
+
+Aquí, en cambio, podemos observar lo separados que están los grupos.
+
+- El clúster que mejor se distingue por sus características es el 2, sin embargo, es el más variado (menos compacto) y presenta valores más altos de max_diss, av_diss y diameter.
+
+- El clúster más 'compacto' es el 1, que presenta valores más bajos de max_diss, av_diss y diameter.
+
+
+
+
+
+```{r, fig.width=12, fig.height=12, out.width="100%", fig.align='center'}
+
+p <- fviz_cluster(pam.res, 
+             data = datoz,
+             palette = c("#00AFBB", "#FC4E07", "#228B22"),
+             ellipse.type = "t",
+             repel = TRUE,           
+             labelsize = 7,          
+             pointsize = 1.5,        
+             ggtheme = theme_minimal()) +
+     labs(title = "Análisis de clústeres de jugadores de la ACB")
+
+# Visualizza
+p
+
+options(repr.plot.width = 15, repr.plot.height = 15)
+
+```
+
+
+Podemos observar que, cuando k = 3, gráficamente algunos jugadores son auténticas 'anomalías' que no encajan en los grupos.
+
+Además, podemos observar que los gráficos se superponen, por lo que no permiten distinguir claramente los grupos en función de sus características.
+
+
+
+
+
+
+## 1.3. Selección del número de clústeres y clustering : 'Manual'
+
+
+Ahora veamos otro método para calcular el valor óptimo de k: el método 'Manual'
+
+
+```{r}
+n <- dim(datoz)[1]                           
+k.min <- 2                                   
+k.max <- 20                                  
+wss <- numeric()                             
+set.seed(12345)                                
+wss[1] <- (n - 1) * sum(apply(datoz, 2, var))
+
+for(k in k.min:k.max){                       
+  wss[k] <- kmeans(datoz, centers = k)$tot.withinss 
+}
+wss 
+diff(wss)
+```
+
+
+
+Los resultados indican que el número ideal de clústeres es de 3 a 5, ya que a partir de ahí la reducción de la 'distancia interna' (WSS) se vuelve mucho menor, por lo que añadir más clústeres ya no ayuda a explicar mejor los datos, sino que solo complica el modelo.
+
+
+
+```{r}
+
+plot(1:k.max, wss,                           
+     xlab = expression(italic(k)),           
+     ylab = expression(italic(W)),           
+     type = "b", lwd = 2)                    
+```
+
+
+
+```{r}
+
+R2 <- 1 - wss/wss[1]                         
+plot(1:k.max, R2,                            
+     xlab = expression(italic(k)),           
+     ylab = expression(italic(R^2)),         
+     type = "b", lwd = 2)                    
+
+```
+
+
+
+También gráficamente se confirma que el valor óptimo de k está entre 3 y 5 clústeres.
+
+Sin embargo, como ya hemos visto qué pasaría con k = 3, comprobemos los otros dos casos.
+
+
+
+
+
+En este punto, creamos un clúster comparando k = 4 y k = 5
+
+```{r}
+fviz_nbclust(datoz,kmeans, method = "wss")+ geom_vline(xintercept = 4, linetype = 2)
+```
+
+
+```{r}
+set.seed(12345)                               
+res.kmeans.4 <- kmeans(datoz, centers = 4, nstart = 50, iter.max = 1000)
+
+print(res.kmeans.4$size)                            
+print(res.kmeans.4$withinss) 
+round(res.kmeans.4$centers, 2)               
+ 
+```
+
+
+El análisis ha dividido la liga en : Especialistas defensivos (1), Reservas (2), Jugadores de equipo (3) y Superestrellas (4).
+
+La división en cuatro grupos agrega un nivel jerárquico basado en el valor absoluto, separando claramente a las 'superestrellas'.
+
+
+
+```{r, fig.width=12, fig.height=12, out.width="100%", fig.align='center'}
+
+
+colori_unici <- c("#E41A1C", "#4DAF4A", 
+                      "#000000", "#00CED1")
+
+# Crear el gráfico asegurando que pasamos los nombres
+p4 <- fviz_cluster(res.kmeans.4, 
+             data = datoz,           # El dataset con rownames actualizados
+             palette = colori_unici, 
+             ellipse.type = "convex",
+             ellipse.alpha = 0.2,      
+             repel = TRUE,           # Evita que se solapen los nombres
+             labelsize = 8,
+             show.clust.cent = TRUE, # Útil para ver el "líder" de cada grupo
+             ggtheme = theme_minimal()) +
+  labs(title = "Segmentación de Jugadores ACB en 4 Clusters",
+       x = "Dimensión 1", 
+       y = "Dimensión 2")
+
+# Ajustar dimensiones y mostrar
+options(repr.plot.width = 15, repr.plot.height = 15)
+print(p4)
+
+```
+
+
+
+
+
+
+Ahora lo comprobamos con k = 5
+
+```{r}
+fviz_nbclust(datoz,kmeans, method = "wss")+ geom_vline(xintercept = 5, linetype = 2)
+```
+
+
+```{r}
+set.seed(12345)                               
+res.kmeans.5 <- kmeans(datoz, centers = 5, nstart = 50, iter.max = 1000)
+
+print(res.kmeans.5$size)                            
+print(res.kmeans.5$withinss) 
+round(res.kmeans.5$centers, 2)               
+ 
+```
+
+
+
+Pasar de 4 a 5 grupos permite al algoritmo comprender que los jugadores de élite no son todos iguales, separando claramente a las 'estrellas exteriores'(cluster 1), que crean juego y anotan desde lejos, de los 'estrellas internas'(cluster 2), que dominan físicamente bajo el aro.
+
+
+
+```{r, fig.width=12, fig.height=12, out.width="100%", fig.align='center'}
+
+
+colori_unici <- c("#E41A1C", "#4DAF4A", 
+                      "#000000", "#00CED1","#A65628")
+
+# Crear el gráfico asegurando que pasamos los nombres
+p5 <- fviz_cluster(res.kmeans.5, 
+             data = datoz,           # El dataset con rownames actualizados
+             palette = colori_unici, 
+             ellipse.type = "convex",
+             ellipse.alpha = 0.2,      
+             repel = TRUE,           # Evita que se solapen los nombres
+             labelsize = 8,
+             show.clust.cent = TRUE, # Útil para ver el "líder" de cada grupo
+             ggtheme = theme_minimal()) +
+  labs(title = "Segmentación de Jugadores ACB en 5 Clusters",
+       x = "Dimensión 1", 
+       y = "Dimensión 2")
+
+# Ajustar dimensiones y mostrar
+options(repr.plot.width = 15, repr.plot.height = 15)
+print(p5)
+
+```
+
+
+
+
+
+
+
+
+
+## 1.4. Selección del número de clústeres y clustering : 'NbClust'
+
+
+Otro método para encontrar el valor óptimo de k es 'NbClust', que calcula decenas de índices estadísticos al mismo tiempo.
+
+
+```{r}
+res.kmeans.NbClust <- NbClust(datoz,distance="euclidean",
+min.nc= 2, max.nc= 20,
+method= "kmeans",index="kl")
+
+
+pander(round(res.kmeans.NbClust$Best.nc,0))
+print(round(res.kmeans.NbClust$Best.partition,0))
+
+```
+
+
+NbClust es mucho más exigente, intenta crear grupos muy específicos; por eso el número de clústeres es tan elevado.
+
+
+
+```{r, fig.width=12, fig.height=12, out.width="100%", fig.align='center'}
+
+
+colori_unici <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", 
+                  "#A65628", "gold", "#F781BF", "#999999", "#000000", "#00CED1")
+
+
+pp <-  fviz_cluster(list(data = datoz, cluster = res.kmeans.NbClust$Best.partition),
+             palette = colori_unici, 
+             ellipse.type = "convex",
+             ellipse.alpha = 0.2,      
+             repel = TRUE,
+             labelsize = 7,
+             show.clust.cent = FALSE,   
+             ggtheme = theme_minimal()) +
+  labs(title = "Segmentación en 11 Clusters" )
+
+# Visualizza
+pp
+
+options(repr.plot.width = 15, repr.plot.height = 15)
+
+```
+
+
+Con k = 11 obtenemos una clasificación detallada de las funciones modernas de la ACB, pero aumenta la complejidad y la dificultad de interpretación de la agrupación.
+
+
+
+**Conclusion**
+
+
+Al final elegimos k = 5 porque es el equilibrio perfecto entre simplicidad estadística y realidad táctica, ya que es el único modelo capaz de separar a las superestrellas en dos perfiles distintos (bases creadores vs. centros dominantes). 
+
+Esta división transforma los datos en una verdadera pizarra de baloncesto, permitiendo identificar no solo quién destaca, sino también qué rol específico desempeña cada jugador en la pista.
+
+
+
+
+
+
+
+# Ejercicio 2: Análisis Clustering de dataset 'ordenadores.txt'
+
+El fichero `ordenadores.txt` contiene las características de 6259 ordenadores personales. Se pide realizar un
+análisis cluster de k-medias para clasificarlos.
+
+Cargamos el archivo como un marco de datos, mostramos su aspecto y normalizamos los datos para que ninguna variable domine todo el conjunto de datos.
+
+```{r}
+ordenadores <- data.frame(read.table("ordenadores.txt", sep="\t", header = T))
+
+pander(head(ordenadores))
+
+ordenadores <- as.data.frame(scale(ordenadores))
+```
+
+Comprobamos si el conjunto de datos está completo, es decir, si hay datos que faltan (`NA`).
+
+
+```{r}
+sum(is.na(ordenadores))
+```
+
+
+## 2.1. Estimación del número inicial de cluster
+
+
+Empezaremos por determinar el número óptimo de clústeres para los siguientes métodos:
+
+1. K-means
+
+2. PAM
+
+3. CLARA
+
+
+### 2.1.  K-medias - número inicial de cluster
+
+
+**WSS**
+
+Empecemos por el método más sencillo para determinar el número óptimo de clústeres, es decir, el método `wss` (*within-cluster sum of squares*), que mide la cohesión interna de los clústeres, es decir, la varianza del clúster.
+
+
+
+```{r}
+set.seed(2137)
+fviz_nbclust(ordenadores, kmeans, method = "wss")+
+  geom_vline(xintercept = 6, linetype = 2)
+```
+
+
+Se observa un claro pliegue (el «codo» de la gráfica) en el punto 6, por lo que, según el método `wss`, el número óptimo de clústeres es **6**.
+
+**WSS - Manual**
+
+
+La segunda forma, análoga a la anterior, consiste en generar manualmente el gráfico anterior, lo que, como era de esperar, arroja resultados similares, es decir, sugiere **6** o **7** clústeres.
+
+
+```{r}
+n <- dim(ordenadores)[1]
+k.min <- 2
+k.max <- 10
+wss <- numeric ()
+set.seed(2137)
+wss [1] <- (n - 1)*sum(apply(ordenadores, 2, var))
+for (k in k.min:k.max){
+  wss[k] <- kmeans(ordenadores, centers = k)$tot.withinss
+}
+wss
+
+plot (1:k.max , wss ,
+      xlab = expression(italic(k)),
+      ylab = expression(italic(W)),
+      type = "b", lwd = 2)
+
+diff(wss)
+
+R2 <- 1 - wss/wss [1]
+plot (1:k.max , R2 ,
+      xlab = expression(italic(k)),
+      ylab = expression(italic(R^2)),
+      type = "b", lwd = 2)
+```
+
+
+**Silhouette**
+
+Un método más completo es el método «silhouette», que mide simultáneamente la cohesión interna y externa de cada uno de los clústeres. Para cada punto, calcula el coeficiente $s(i)$, que evalúa en qué medida ese punto pertenece a su propio clúster y a qué distancia se encuentra del clúster vecino más cercano.
+
+
+
+```{r}
+set.seed(420)
+fviz_nbclust(ordenadores, kmeans, method = "silhouette", k.max = 10) +
+  theme_minimal() +
+  ggtitle("Coeficiente de silueta")
+```
+
+
+Vemos que el método `silhouette` también sugiere elegir **6 clústeres** para el método `k-means`, por lo que continuaremos el análisis con ese número.
+
+
+### 2.2. PAM y CLARA - número inicial de cluster
+
+Veamos cuál es el número óptimo de clústeres para `PAM`.
+
+```{r}
+library(parameters)
+
+set.seed(2137)
+res_PAM <- n_clusters_silhouette(ordenadores,
+                                 distance_method = "euclidean",
+                                 clustering_function= cluster::pam,
+                                 n_max = 5)
+
+
+res_PAM
+
+max(res_PAM$Silhouette)
+```
+
+
+Ahora busquemos el número óptimo de clústeres para el método CLARA y comparemos si obtenemos resultados similares.
+
+
+**WSS y Silhouette**
+
+
+```{r}
+set.seed(2137)
+fviz_nbclust(ordenadores, cluster::clara, method = "wss") +
+  theme_classic()
+
+fviz_nbclust(ordenadores, cluster::clara, method = "silhouette") +
+  theme_classic()
+```
+
+
+Ambos métodos sugieren el uso de **5 clústeres**.
+
+
+
+## 2.3. Algorítmo K-medias
+
+En el primer bloque, se procede a la creación del modelo de agrupación:
+
+`set.seed(2137)`: Se establece una semilla aleatoria para garantizar la reproducibilidad del análisis. Esto asegura que los resultados sean los mismos cada vez que se ejecute el código.
+
+`kmeans(ordenadores, 6, nstart = 25)`: Se aplica el algoritmo de k-medias para dividir los datos en 6 clusters. El parámetro nstart = 25 indica que el algoritmo probará 25 configuraciones iniciales diferentes de los centroides, seleccionando la que minimice la variación total dentro de los grupos, lo que ayuda a encontrar un óptimo global.
+
+```{r}
+set.seed(2137)
+kmedias <- kmeans(ordenadores, 6, nstart = 25)
+```
+
+```{r}
+fviz_cluster(kmedias, data = ordenadores, 
+             geom = "point",
+             pointsize = 0.5,
+             alpha = 0.4,
+             ellipse.type = "convex",
+             ggtheme = theme_minimal())
+```
+
+**Identificación de Grupos (6 Clusters):**
+
+- Cluster 6 (Magenta): Se sitúa en el extremo derecho de la gráfica. Es el grupo más disperso y diferenciado, lo que sugiere que representa ordenadores con características "extremas" o de gama muy alta que se alejan del promedio general.
+
+- Clusters 2 (Amarillo) y 5 (Azul): Estos grupos están bien definidos en las zonas inferiores e izquierdas del gráfico. El Cluster 5 parece agrupar equipos con valores bajos en la dimensión 2, mientras que el Cluster 2 representa el segmento de entrada o más económico.
+
+Solapamiento (Clusters 1, 3 y 4): Se observa una superposición significativa entre los clusters 1 (rojo), 3 (verde) y 4 (celeste) en la parte central. Esto indica que los ordenadores en estos grupos comparten características muy similares y que las fronteras entre estos segmentos no son tan nítidas en el espacio bidimensional.
+
+**Morfología de los Clusters (Cascos Convexos):**
+
+Las líneas de colores representan los "convex hulls" (cascos convexos), que encierran todos los puntos pertenecientes a cada grupo. El hecho de que algunos cascos sean mucho más grandes que otros (como el del cluster 6 frente al 3) indica una mayor heterogeneidad dentro de esos grupos específicos.
+
+**Conclusión Visual:**
+
+Aunque el algoritmo ha logrado separar los datos en 6 categorías, la cercanía y el solapamiento entre los grupos centrales sugieren que el mercado de ordenadores es un continuo de características. El modelo es especialmente útil para identificar los nichos claramente diferenciados (como el cluster 6 y el cluster 5), mientras que los grupos centrales podrían requerir un análisis más profundo de sus centroides para distinguir sus ventajas competitivas específicas.
+
+```{r}
+fviz_cluster(kmedias,
+             data=ordenadores,
+             geom = "point",
+             pointsize = 0.5,
+             alpha = 0.4, 
+             ellipse.type = "euclid",
+             ggtheme = theme_minimal()
+)
+```
+
+**Varianza Total Explicada:**
+
+El gráfico muestra que el Análisis de Componentes Principales (PCA) logra capturar un 61.5% de la varianza total de los datos en solo dos dimensiones (Dim1: 40.9% + Dim2: 20.6%). Al superar el 60%, podemos confiar en que la disposición de los puntos en el gráfico es una representación fiel de la estructura real del dataset de ordenadores.
+
+**Uso de Elipses Euclidianas (ellipse.type = "euclid"):**
+
+A diferencia del gráfico anterior (convexo), aquí se utilizan elipses euclidianas. Estas representan círculos de confianza basados en la distancia promedio desde el centroide:
+
+- Permiten visualizar qué tan "compacto" es un grupo. Por ejemplo, los clusters 2 (amarillo) y 3 (verde) son muy compactos, lo que sugiere que los ordenadores en estos grupos tienen especificaciones técnicas muy similares entre sí.
+
+- El Cluster 6 (magenta) tiene muchos puntos fuera de su elipse, lo que confirma que es el grupo con mayor cantidad de valores atípicos (outliers) o mayor diversidad de modelos.
+
+**Análisis de la Dimensión 1 (Eje X):**
+
+La Dim1 explica casi el 41% de la varianza. Se observa una clara progresión de izquierda a derecha. Es muy probable que esta dimensión represente la potencia o gama del ordenador (combinación de precio, RAM y procesador), situando a los modelos básicos a la izquierda y a los de alto rendimiento a la derecha.
+
+**Separación de los Grupos:**
+
+- Segmentación Vertical: El Cluster 5 (azul) se diferencia de los demás principalmente por la Dimensión 2, lo que sugiere que posee una característica única que lo separa del resto (podría ser, por ejemplo, el tamaño de pantalla o el tipo de disco duro).
+
+- Solapamiento Central: Las elipses de los grupos 1 (rojo) y 4 (celeste) se cruzan significativamente, indicando que existe una zona de transición donde los ordenadores podrían pertenecer a cualquiera de los dos grupos según criterios muy sutiles.
+
+**Conclusión Técnica:**
+
+Esta visualización es ideal para identificar los "núcleos" de cada segmento de mercado. Mientras que los grupos 2 y 3 están muy consolidados, el grupo 6 representa un mercado mucho más heterogéneo y disperso.
+
+
+```{r}
+round(kmedias$centers,2)
+
+round(aggregate(. ~ kmedias$cluster, data = ordenadores, FUN = mean)[, -1], 2)
+```
+
+
+## 2.4. PAM
+
+En esta sección, se aplica el algoritmo PAM, una técnica de particionamiento más robusta que K-means. A diferencia de K-means, que utiliza centroides (medias aritméticas), PAM utiliza medoides: objetos reales y representativos del conjunto de datos. Esta característica lo hace menos sensible a valores atípicos o outliers que puedan existir en el catálogo de ordenadores.
+
+```{r}
+pam.res <- pam(ordenadores, 5)
+```
+
+**Análisis de la estructura de los grupos**
+
+`pam.res$clusinfo`: Este comando devuelve una tabla con información estadística crucial sobre los clusters formados. Incluye:
+
+- `size`: El número de ordenadores asignados a cada grupo.
+
+- `max_diss`: El diámetro del cluster (la distancia máxima entre objetos del mismo grupo).
+
+- `av_diss`: La disimilitud media, que mide la cohesión interna.
+
+- `separation`: La distancia al vecino más cercano, que mide qué tan bien separado está un grupo de otro.
+
+```{r}
+pam.res$clusinfo
+```
+
+```{r}
+fviz_cluster(pam.res,
+             geom = 'point',
+             alpha = 0.6,
+             pointsize = 0.5,
+             ellipse.type = "t", # Concentration ellipse
+             ggtheme = theme_minimal()
+)
+```
+
+Este gráfico visualiza los resultados del algoritmo PAM utilizando 5 grupos. Las dos componentes principales explican un sólido 61.5% de la varianza total de los datos.
+
+Elipses de Concentración: El uso de elipses tipo "t" permite identificar con claridad el núcleo central de cada categoría, ignorando visualmente los puntos más extremos para definir mejor cada segmento de mercado.
+
+Distribución de los Grupos: Se observa una progresión clara a lo largo de la Dim1 (40.9%), donde el Cluster 4 (cian) representa los ordenadores de gama más alta y mayor potencia. Por el contrario, los Clusters 2 (amarillo) y 3 (verde) se agrupan en la zona de especificaciones más básicas.
+
+Cohesión: Existe un solapamiento significativo entre los grupos 1, 2 y 3, lo que indica que estos segmentos de ordenadores comparten características muy similares, mientras que el grupo 4 y el grupo 5 (morado) muestran una diferenciación más clara en sus perfiles técnicos.
+
+
+
+## 2.5. CLARA
+
+Para terminar, utilizaremos el método CLARA con los mismos parametros que para PAM, que facilita el procesamiento de grandes conjuntos de datos.
+
+```{r}
+# Ustawiamy ziarno
+set.seed(2137)
+
+cluster_CLARA <- clara(ordenadores, k = 5,
+                       stand = T, metric = "euclidean")
+```
+
+```{r}
+fviz_cluster(cluster_CLARA,
+             geom = 'point',
+             alpha = 0.6,
+             pointsize = 0.5,
+             ellipse.type = "t", # Concentration ellipse
+             ggtheme = theme_minimal()
+)
+```
+
+**Conclusión del análisis con CLARA**
+
+Al aplicar el algoritmo CLARA sobre el conjunto de datos de ordenadores, se observa que los resultados obtenidos son prácticamente idénticos a los del algoritmo PAM. La distribución de los puntos, la formación de los 5 clusters y la varianza explicada por las componentes principales (61.5%) se mantienen constantes.
+
+Puntos clave:
+
+- Consistencia: El hecho de obtener los mismos resultados confirma la estabilidad de la estructura de grupos identificada previamente.
+
+- Eficiencia: Aunque los resultados son similares, CLARA es el método más adecuado para este dataset de 6259 registros, ya que utiliza técnicas de muestreo para optimizar el tiempo de computación sin perder precisión en la identificación de los medoides.
+
+- Segmentación: Se valida la existencia de un segmento diferenciado de alto rendimiento (Cluster 4) y una zona central donde los modelos de gama media y básica tienden a solaparse.
+
+En resumen, CLARA confirma la validez del modelo PAM aportando una mayor eficiencia en el procesamiento de grandes volúmenes de información.
+
+
+
+
+
