@@ -1,0 +1,673 @@
+---
+title: "Ejercicios Introducción"
+author: "Jan Żurek y Guido D'Inverno"
+date: "03/2026"
+output: 
+  pdf_document: 
+    toc: true
+    highlight: tango
+editor_options: 
+  chunk_output_type: inline
+  latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(dlookr)
+knitr::opts_chunk$set(
+  include = TRUE,
+  echo = TRUE,    
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+# Ejercicio 1
+
+## 1. Abrir correctamente el fichero de datos.
+
+Carguemos los datos y comprobemos su estructura.
+
+```{r}
+data<-read.table("ejercicio1.txt")
+str(data)
+```
+
+Queremos cambiar `V1` a tipo factor y todas columnas otros a `numeric`.
+
+```{r}
+data<- data %>%
+  mutate(V1 = as.factor(V1))
+
+# Convertimos explícitamente las demás variables a los tipos correctos:
+data$V2 <- as.numeric(data$V2)
+data$V3 <- as.numeric(data$V3)
+data$V4 <- as.numeric(data$V4)
+data$V5 <- as.numeric(data$V5)
+str(data)
+```
+
+## 2. Comprobar si existen datos faltantes.
+
+Podemos comprobar los datos faltantes usando `overwiew`.
+
+```{r}
+kable(overview(data))
+```
+
+Otra manera para hacerlo es usar `diagnose`.
+
+```{r}
+kable(diagnose(data))
+```
+
+Nos vemos que hay un valor `NA` en `V3` y `V4`.
+
+### 2.1. Gestión de valores faltantes (NA)
+
+```{r}
+which(is.na(data))    # Devuelve los índices globales de los valores NA en el conjunto de datos.
+colSums(is.na(data))  # Muestra un recuento práctico de cuántos NA hay por cada columna.
+apply(is.na(data), 2, which) # Muestra exactamente en qué filas se encuentran los NA para cada columna.
+```
+
+Si queremos eliminar todas filas con `NA` podemos usar `na.omit`.
+
+```{r}
+datos <- na.omit(data)
+```
+
+```{r, include=FALSE}
+cat('Tamaño de los datos originales: ', dim(data), '\n',
+    'Tamaño de los datos sin NA: ', dim(datos), '\n')
+```
+
+Comprobamos si hemos eliminado todos los valores NA.
+
+```{r}
+colSums(is.na(datos))
+```
+
+## 3. Realizar un resumen descriptivo de las variables.
+
+```{r}
+kable(summary(datos))
+```
+
+Usando biblioteca pastecs para columnos 2-5 (cuantitativas):
+
+```{r}
+library(pastecs)
+kable(round(stat.desc(datos[,c(-1)]),2))
+```
+
+## 4. Realizar representaciones graficas y determinar si existen datos anomalos (diagramas de caja, histograma...). hacerlos tambien por grupos de la variable V1.
+
+### 4.1 Histogramas
+
+```{r}
+data %>%
+  select(V2, V3, V4, V5) %>% 
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Valor") %>% 
+  ggplot(aes(x = Valor, fill = Variable)) +
+  geom_histogram(bins = 30, color = "white", alpha = 0.7) +
+  facet_wrap(~Variable, scales = "free") + 
+  theme_minimal() +
+  labs(title = "Histogramas de V2, V3, V4 y V5", y = "Recuento") +
+  theme(legend.position = "none")
+```
+
+### 4.2 Diagramas de caja
+
+```{r}
+data %>%
+  select(V2, V3, V4, V5) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Valor") %>%
+  ggplot(aes(x = Variable, y = Valor, fill = Variable)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~Variable, scales = "free") +
+  theme_minimal() +
+  labs(title = "Diagramas de Caja para V2, V3, V4 y V5", y = "Medida") +
+  theme(legend.position = "none")
+```
+
+## 5. Calcular las correlaciones de las variables.
+
+```{r}
+data5 <- data[complete.cases(data),]
+data5 <- data5[,-1]
+
+data55 <- sapply(data5, is.numeric)
+
+correlaciones <- cor(data5[,data55])
+
+library(psych)
+corPlot(correlaciones,pval=T,scale=FALSE)
+```
+
+## 6. Comprobar la hipotesis de normalidad, linealidad y homocedasticidad.
+
+### 6.1. Normalidad
+
+Queremos comprobar si los datos son normales. Lo haremos utilizando estadisticos basicos, QQplots, la densidad funccion y testos.
+
+#### 6.1.1. Estadisticos
+
+```{r}
+library(pastecs)
+kable(round(stat.desc(data5[,data55],basic=FALSE,norm=TRUE), digits=3))
+```
+
+#### 6.1.2. QQplots
+
+```{r}
+library(car)
+par(mfrow = c(2, 2))
+
+qqPlot(data5$V2)
+qqPlot(data5$V3)
+qqPlot(data5$V4)
+qqPlot(data5$V5)
+
+par(mfrow = c(1, 1))
+```
+
+#### 6.1.3. La densidad
+
+```{r}
+data %>%
+  select(V2, V3, V4, V5) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Valor") %>%
+  ggplot(aes(Valor)) +
+  geom_density() +
+  facet_wrap(~Variable, scales = "free") +
+  theme_minimal() +
+  labs(title = "Densidad de V2, V3, V4 y V5") +
+  theme(legend.position = "none")
+```
+
+#### 6.1.4. Testos de normalidad
+
+```{r}
+library(MVN)
+library(kableExtra)
+# resultado_Lillie <- mvn(data5, univariateTest = "Lillie")
+
+# --- TABLA 1: Test de Normalidad Multivariante ---
+kable(resultado_Lillie$multivariateNormality, 
+      caption = "Test de Normalidad Multivariante (Mardia)",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = "striped", full_width = FALSE)
+
+# --- TABLA 2: Test de Normalidad Univariante ---
+kable(resultado_Lillie$univariateNormality, 
+      caption = "Test de Normalidad Univariante (Lilliefors)",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = "striped", full_width = FALSE)
+
+# --- TABLA 3: Estadísticos Descriptivos ---
+kable(resultado_Lillie$Descriptives, 
+      caption = "Estadísticos Descriptivos del Conjunto de Datos",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = "striped", full_width = FALSE)
+```
+
+```{r}
+resultado_mardia <- mvn(data5, mvnTest = "mardia")
+
+# --- TABLA 1: Test de Mardia (Normalidad Multivariante) ---
+kable(resultado_mardia$multivariateNormality, 
+      caption = "Test de Mardia para Normalidad Multivariante",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE)
+
+# --- TABLA 2: Test de Normalidad Univariante ---
+kable(resultado_mardia$univariateNormality, 
+      caption = "Test de Normalidad Univariante (Shapiro-Wilk por defecto)",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE)
+
+# --- TABLA 3: Estadísticos Descriptivos ---
+kable(resultado_mardia$Descriptives, 
+      caption = "Estadísticos Descriptivos de las Variables",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), font_size = 10)
+```
+
+```{r}
+resultado_royston <- mvn(data5, mvnTest = "royston")
+
+# --- TABLA 1: Test de Royston (Normalidad Multivariante) ---
+kable(resultado_royston$multivariateNormality, 
+      caption = "Test de Royston para Normalidad Multivariante",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE)
+
+# --- TABLA 2: Test de Normalidad Univariante ---
+kable(resultado_royston$univariateNormality, 
+      caption = "Test de Normalidad Univariante (Shapiro-Wilk)",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE)
+
+# --- TABLA 3: Estadísticos Descriptivos ---
+kable(resultado_royston$Descriptives, 
+      caption = "Estadísticos Descriptivos de las Variables",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), font_size = 10)
+```
+
+### 6.2 Homocedasticidad
+
+```{r}
+# Definimos las variables a testear y el grupo
+variables_a_testear <- c("V2", "V3", "V4", "V5")
+
+# Creamos una lista para almacenar los resultados
+resultados_levene <- lapply(variables_a_testear, function(var) {
+  # Creamos la fórmula dinámicamente: ej. V2 ~ V1
+  formula_test <- as.formula(paste(var, "~ V1"))
+  
+  # Ejecutamos el test de Levene (usando la mediana por defecto, que es más robusto)
+  test <- leveneTest(formula_test, data = data)
+  
+  # Extraemos los valores: Grados de libertad, F y p-valor
+  data.frame(
+    Variable = var,
+    Df = test$Df[1],
+    Estadistico_F = round(test$`F value`[1], 4),
+    p_valor = round(test$`Pr(>F)`[1], 4)
+  )
+})
+
+# Unimos todos los resultados en una sola tabla
+tabla_homocedasticidad <- do.call(rbind, resultados_levene)
+
+# Añadimos la interpretación basada en el nivel de significación 0.05
+tabla_homocedasticidad$Interpretacion <- ifelse(tabla_homocedasticidad$p_valor > 0.05, 
+                                                "Homocedasticidad (Varianzas Iguales)", 
+                                                "Heterocedasticidad (Varianzas Diferentes)")
+
+# Mostramos la tabla con kable
+kable(tabla_homocedasticidad, 
+      caption = "Test de Levene para la Homocedasticidad (Agrupado por V1)",
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE)
+```
+
+### 6.3 Linealidad
+
+```{r}
+library("PerformanceAnalytics")
+
+plot(data5)
+```
+
+```{r}
+chart.Correlation(data5)
+```
+
+
+
+
+
+```{r setup2, include=FALSE}
+# Configurazione globale dei blocchi di codice
+knitr::opts_chunk$set(
+  include = TRUE,   #mostra i grafici e le tabelle 
+  echo = TRUE,      # Mostra il codice nel PDF
+  warning = FALSE,   # Nasconde i messaggi di avviso
+  message = FALSE    # Nasconde i messaggi di caricamento
+)
+library(dplyr)    # Manipolazione dati
+library(ggplot2)  # Grafici avanzati
+library(GGally)   # Grafici di correlazione e pairs plot
+library(car)      # Test di Levene e QQ-plots
+library(MVN)      # Test di Normalità Multivariata
+library(psych)    # Statistiche descrittive
+library(biotools) # Test M di Box
+library(tidyr)
+library(modeest)
+library(pastecs)
+library(corrplot)
+library(PerformanceAnalytics)
+library(knitr)
+library(nortest)
+library(MVN)
+```
+
+# Ejercicio 2
+
+## 1. Abrir correctamente el fichero de datos.
+
+```{r}
+datos <- iris
+
+
+kable(head(datos))
+
+
+#Analicemos la estructura de las variables
+str(datos)
+
+#Verificación de valores faltantes
+
+sum(is.na(datos))
+
+```
+
+
+
+## 2. Realizar una síntesis descriptiva de las variables generales y por variedad de IRIS.
+
+```{r}
+# Resumen general del dataset
+kable(summary(datos))
+```
+
+Un dataset bien distribuido. Petal.Length: La Media es más baja que la mediana. En estadística, cuando la media y la mediana están distantes, la distribución es asimétrica (señal de que estamos analizando grupos diferentes entre sí).
+
+```{r}
+# Descripción detallada de las variables numéricas
+kable(describe(datos[,-5]))
+```
+
+La Curtosis fuertemente negativa de los Pétalos indica una probable distribución multimodal (no estamos midiendo un único grupo uniforme). Se observa una altísima variabilidad en la longitud de los pétalos.
+
+```{r}
+# Calculamos las estadísticas incluyendo los tests de normalidad (norm = TRUE)
+stat_norm <- stat.desc(datos[, -5], norm = TRUE)
+
+# Seleccionamos las filas útiles para la normalidad y redondeamos a 3 decimales
+righe_normalita <- stat_norm[c("skewness", "kurtosis", "normtest.W", "normtest.p"), ]
+kable(round(righe_normalita, 3))
+```
+
+Sepal.Width: Es la variable más estable y la única que pasa el test de normalidad. Los pétalos confirman que estamos tratando con múltiples grupos dentro de la misma variable. El sépalo no muestra una evidencia clara de multimodalidad porque generalmente es el pétalo el elemento que sufre más variación según la especie.
+
+```{r}
+# Aplicar summary() a todo el dataset, dividido por Species
+by(datos, datos$Species, summary)
+```
+
+La variedad Setosa se distingue claramente por tener pétalos significativamente más pequeños y uniformes. La variedad Virginica presenta los valores máximos en casi todas las mediciones. Las variedades Versicolor y Virginica presentan cierto solapamiento.
+
+```{r}
+describeBy(datos[, -5], group = datos$Species)
+```
+
+Virginica tiene la variabilidad más alta entre las variables.El problema de la curtosis en los pétalos desaparece, excepto en Setosa,donde la asimetría podría ser causada por posibles casos atípicos (outliers). Setosa es la especie más homogénea con un rango muy pequeño en los pétalos.
+
+## 3. Realizar representaciones gráficas totales y por variedad.
+
+```{r}
+# Transformación de datos a formato largo para facilitar el gráfico
+datos_long <- datos %>% 
+  pivot_longer(cols = 1:4, names_to = "Variabile", values_to = "Misura")
+
+```
+
+
+
+**Histogramas**
+
+```{r,}
+# Distribución general
+ggplot(datos_long, aes(x = Misura)) + 
+  geom_histogram(bins = 20, color = "white", alpha = 0.7, position = "identity") + 
+  facet_wrap(~ Variabile, scales = "free") + 
+  theme_minimal() + 
+  labs(title = "Distribución de las variables", 
+       x = "Valor (cm)", 
+       y = "Frecuencia") 
+
+# Distribución por Especies
+ggplot(datos_long, aes(x = Misura, fill = Species)) + 
+  geom_histogram(bins = 20, color = "white", alpha = 0.7, position = "identity") + 
+  facet_wrap(~ Variabile, scales = "free") + 
+  theme_minimal() + 
+  labs(title = "Distribución de las variables por Especies", 
+       x = "Valor (cm)", 
+       y = "Frecuencia") + 
+  scale_fill_manual(values = c("setosa" = "#E41A1C", "versicolor" = "#377EB8", "virginica" = "#4DAF4A"))
+
+```
+
+
+
+**Boxplot**
+
+```{r}
+# Boxplot Global
+ggplot(datos_long, aes(x = Variabile, y = Misura, fill = Variabile)) + 
+  geom_boxplot(outlier.shape = NA, alpha = 0.5) + 
+  geom_jitter(width = 0.2, size = 0.8, alpha = 0.4, color = "black") + 
+  facet_wrap(~ Variabile, scales = "free") + 
+  theme_minimal() + 
+  labs(title = "Boxplot Global", 
+       subtitle = "Visualización de la distribución total (150 observaciones por variable)", 
+       x = "Variable", 
+       y = "Valor (cm)") + 
+  theme(legend.position = "none")
+
+# Boxplot por Especies
+ggplot(datos_long, aes(x = Species, y = Misura, fill = Species)) + 
+  geom_boxplot(outlier.shape = NA, alpha = 0.5) + 
+  geom_jitter(width = 0.2, size = 1, alpha = 0.6, color = "black") + 
+  facet_wrap(~ Variabile, scales = "free") + 
+  theme_minimal() + 
+  labs(title = "Boxplot por Especies", 
+       subtitle = "Cada punto representa una flor (n=50 por especie)", 
+       x = "Especie", 
+       y = "Valor (cm)") + 
+  scale_fill_brewer(palette = "Set1")
+
+```
+
+
+
+**Diagramas de Violín**
+
+```{r}
+
+# # Utilizamos el conjunto de datos en formato 'long'
+ggplot(datos_long, aes(x = Species, y = Misura, fill = Variabile)) +
+  # Il Violino (mostra la densità/forma dei dati)
+  geom_violin(trim = FALSE, alpha = 0.5) +
+  
+  #  Los puntos (jitter) para la máxima transparencia
+  geom_jitter(width = 0.1, size = 0.5, alpha = 0.4) +
+  
+  #  Subdivisión en 4 paneles
+  facet_wrap(~ Variabile, scales = "free") +
+  
+  theme_minimal() +
+  labs(title = "Diagramas de Violino",
+       subtitle = "La anchura del violín indica la densidad de las observaciones",
+       y = "Valor (cm)") 
+
+
+
+
+# Utilizamos el conjunto de datos en formato 'long'
+ggplot(datos_long, aes(x = Species, y = Misura, fill = Species)) +
+  # Il Violino (mostra la densità/forma dei dati)
+  geom_violin(trim = FALSE, alpha = 0.5) +
+  
+ #  Los puntos (jitter) para la máxima transparencia
+  geom_jitter(width = 0.1, size = 0.5, alpha = 0.4) +
+  
+#  Subdivisión en 4 paneles
+  facet_wrap(~ Variabile, scales = "free") +
+  
+  theme_minimal() +
+  labs(title = "Diagramas de Violino for Species",
+       subtitle = "La anchura del violín indica la densidad de las observaciones",
+       x = "Species",
+       y = "Valor (cm)") +
+  scale_fill_brewer(palette = "Set1")
+```
+
+
+
+## 4. Calcular las correlaciones de las variables.
+
+```{r}
+datos_num <- datos[sapply(datos, is.numeric)] 
+matrix_cor <- cor(datos_num) 
+kable(matrix_cor, caption = "Matriz de Correlación")
+
+# Personalización del gráfico de correlación
+col_custom <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))(200)
+
+corrplot(matrix_cor, 
+         method = "color",          
+         type = "lower",            
+         order = "original", 
+         col = col_custom,          
+         addCoef.col = "black",      
+         tl.col = "black",          
+         tl.srt = 45,                
+         diag = TRUE,               
+         mar = c(0,0,2,0), 
+         title = "Matriz de Correlación")
+
+```
+
+Correlación positiva casi perfecta entre Petal.Length y Petal.Width. En términos biológicos: si un pétalo es largo, casi con seguridad es también ancho (variables redundantes). La longitud del sépalo está fuertemente ligada a la longitud del pétalo. Anomalía de Sepal.Width: Es la única variable con correlaciones negativas con las demás. Las flores con pétalos más largos tienden a tener sépalos ligeramente más estrechos.
+
+
+
+## 5. Verificar hipótesis de normalidad, linealidad y homocedasticidad.
+
+
+**Linealidad**
+
+```{r}
+# Matriz de correlación y linealidad completa
+chart.Correlation(datos_num, histogram = TRUE, pch = 19)
+```
+
+En los sépalos la distribución es acampanada (normal), pero los pétalos forman 2 picos, evidenciando la presencia de múltiples grupos. Los scatter plots muestran que solo los pétalos entre sí tienen una clara relación lineal; en los demás se observa curvatura, sugiriendo una distribución no lineal global.
+
+```{r}
+# Visualización por especies 
+ggpairs(datos, 
+        columns = 1:4, 
+        aes(color = Species, alpha = 0.5), 
+        upper = list(continuous = wrap("cor", size = 3))) + 
+  theme_minimal() + 
+  labs(title = "Linealidad y Distribuciones por Especie")
+```
+
+Aquí notamos que, por especie, todas las variables tienen una distribución acampanada. La relación lineal mejora, especialmente entre Versicolor y Virginica.
+
+
+
+**Normalidad Univariada**
+
+```{r}
+# Generación de QQ-Plots globales
+par(mfrow = c(2, 2)) 
+for (i in 1:4) { 
+  qqPlot(datos_num[, i], 
+         main = paste("QQ-Plot:", colnames(datos_num)[i]), 
+         id = FALSE) 
+} 
+par(mfrow = c(1, 1))
+```
+
+Los pétalos no tienen una distribución normal, ya que, a diferencia de los sépalos, su valor varía más.
+
+```{r}
+# QQ-Plots por Variable y Especies
+ggplot(datos_long, aes(sample = Misura, color = Species)) + 
+  stat_qq_line() + 
+  stat_qq() + 
+  facet_grid(Variabile ~ Species, scales = "free") + 
+  theme_minimal() + 
+  labs(title = "QQ-Plots por Variable y Especies", 
+       subtitle = "La normalidad se respeta si los puntos siguen la línea diagonal", 
+       x = "Cuantiles Teóricos", 
+       y = "Cuantiles Muestrales") + 
+  theme(legend.position = "none")
+```
+
+Ahora, analizando por especies, todas las variables tienen una distribución normal.
+
+```{r}
+# Test de Lilliefors (K-S) Global
+resultados <- sapply(datos_num, function(x) { 
+  test <- lillie.test(x) 
+  c(D = test$statistic, p_value = test$p.value) 
+}) 
+kable(as.data.frame(t(resultados)), digits = 4, caption = "Test de Normalidad de Lilliefors (Global)")
+```
+
+Ningún valor respeta la hipótesis de normalidad.
+
+```{r}
+# Test de Lilliefors agrupado por Especies
+tabella_final_sp <- datos %>% 
+  pivot_longer(cols = 1:4, names_to = "Variabile", values_to = "Valore") %>% 
+  group_by(Species, Variabile) %>% 
+  summarise( 
+    D = lillie.test(Valore)$statistic, 
+    p_value = lillie.test(Valore)$p.value, 
+    .groups = 'drop' 
+  ) 
+kable(tabella_final_sp, digits = 4, caption = "Test de Lilliefors por Variable y Especies")
+
+```
+
+La línea setosa de Petal.Width tiene un valor p de 0,0000, debido a que las mediciones son muy pequeñas en la especie sedosa. Esto indica poca variabilidad, pero en general se confirma la normalidad univariante para todas las variables.
+
+
+
+**Normalidad Multivariada**
+
+```{r}
+
+hz_res <- mvn(datos_num, mvnTest = "hz")
+
+risultato_norm <- as.data.frame(hz_res$multivariate_normality)
+
+
+risultato_norm$MVN <- iconv(risultato_norm$MVN, to = "ASCII//TRANSLIT")
+risultato_norm$MVN <- gsub("[^[:alnum:][:space:][:punct:]]", "", risultato_norm$MVN)
+
+risultato_norm$MVN <- ifelse(grepl("YES", risultato_norm$MVN, ignore.case = TRUE), "SI", "NO")
+
+
+kable(risultato_norm, caption = "Test de Normalidad Multivariada (Henze-Zirkler)")
+```
+
+Si analizamos el dataset completo, la probabilidad de normalidad es cero , debido a la mezcla de diferentes especies (grupos).
+
+
+
+**Homocedasticidad**
+
+```{r}
+levene_summary <- sapply(datos_num, function(x) { 
+  test <- leveneTest(x ~ datos$Species) 
+  c(F_stat = test$`F value`[1], p_value = test$`Pr(>F)`[1]) 
+}) 
+
+kable(t(levene_summary), 
+      digits = 4, 
+      col.names = c("Estadístico F", "p-value"), 
+      caption = "Resultados Test de Levene para cada Variable")
+
+```
+
+Sepal.Width es la única variable que presenta homocedasticidad. En los demás casos, la diferencia de varianzas sugiere nuevamente la fuerte distinción entre especies.
+
+
+
+
+
+
+
