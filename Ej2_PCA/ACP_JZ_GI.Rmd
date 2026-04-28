@@ -1,0 +1,916 @@
+---
+title: "Ejercicios Análisis de Componentes Principales"
+author: "Jan Żurek y Guido D'Inverno"
+date: "03/2026"
+output: 
+  pdf_document: 
+    toc: true
+    highlight: tango
+editor_options: 
+  chunk_output_type: inline
+  latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+# Configurazione globale dei blocchi di codice
+knitr::opts_chunk$set(
+  include = TRUE,   #mostra i grafici e le tabelle 
+  echo = TRUE,      # Mostra il codice nel PDF
+  warning = FALSE,   # Nasconde i messaggi di avviso
+  message = FALSE    # Nasconde i messaggi di caricamento
+)
+library(dplyr)    
+library(ggplot2)  
+library(GGally)
+library(car)      
+library(MVN)      
+library(psych)    
+library(biotools) 
+library(tidyr)
+library(modeest)
+library(pastecs)
+library(corrplot)
+library(PerformanceAnalytics)
+library(knitr)
+library(kableExtra)
+library(nortest)
+library(MVN)
+library(paran)
+library(nFactors)
+library(patchwork)
+library(corrplot)
+library(psych)
+library(paran)
+library(FactoMineR)
+library(factoextra)
+library(readxl)
+library(ade4)
+```
+
+
+# Ejercicio 1: Análisis de Componentes Principales del Decatlón Olímpico
+
+## 1.1. Comprobación del fichero de datos y análisis de correlaciones
+
+```{r, ej1.1.}
+library(readxl)
+library(dplyr)
+decathlon <- as.data.frame(read_excel("decathalon.xlsx"))
+
+rownames(decathlon) <- decathlon[[1]]
+decathlon <- decathlon[, -1]
+
+decathlon <- decathlon %>%
+  mutate(across(, as.numeric))
+```
+
+Comprobamos si hay `NA` valores en datos y eliminamos a los atletas que no tienen una puntuación total.
+
+```{r}
+
+sum(is.na(decathlon))
+
+colSums(is.na(decathlon))
+
+decat_filtr <- decathlon[!is.na(decathlon$total),  ]
+
+cat("Atletas eliminados:", sum(is.na(decathlon$total)))
+```
+
+Presentamos los datos filtrados.
+
+```{r}
+library(knitr)
+kable(head(decat_filtr))
+
+summary(decat_filtr)
+
+plot(decat_filtr)
+```
+
+Podemos ver claramente que las variables están en escalas muy diferentes, por lo que necesitamos reescalarlas.
+
+```{r}
+library(ggplot2)
+boxplot(decat_filtr)
+```
+
+```{r}
+dec_resc <- scale(decat_filtr)
+boxplot(dec_resc)
+```
+
+Ahora podemos analizar correlacion.
+
+```{r, include=FALSE}
+for(i in 1:ncol(dec_resc)) {
+  dec_resc[is.na(dec_resc[,i]), i] <- mean(dec_resc[,i], na.rm = TRUE)
+}
+```
+
+```{r}
+library(corrplot)
+
+dec_resc <- subset(dec_resc, select = -total)
+
+
+R <- cor(dec_resc, method="pearson")
+
+corrplot(R, sig.level=0.05, typ="lower")
+```
+
+### Resumen del Análisis de Correlación
+
+El correlograma presentado permite identificar las relaciones lineales entre las diez pruebas del decatlón antes de proceder al Análisis de Componentes Principales. A continuación se detallan las observaciones clave:
+
+*   **Sinergia en Lanzamientos:** Se observa una fuerte correlación positiva entre el lanzamiento de **Peso** y el de **Disco** (representada por círculos azules intensos). Esto sugiere que ambas pruebas dependen de una base común de fuerza explosiva en el tren superior.
+*   **Relación entre Velocidad y Saltos:** Existe una correlación negativa significativa entre los **100m** y la **Longitud** (círculo rojo). Dado que los 100m se miden en tiempo (menos es mejor) y la longitud en distancia (más es mejor), esta relación indica una asociación atlética positiva: los corredores más rápidos tienden a obtener mayores distancias en el salto.
+*   **Consistencia en Carreras:** Las pruebas de **100m, 110m vallas y 400m** muestran correlaciones positivas entre sí. Los atletas con tiempos elevados en una de estas pruebas suelen mantener esa tendencia en las demás, lo que define un perfil de velocidad/resistencia anaeróbica.
+*   **Pruebas Técnicas y de Resistencia:** La prueba de **1500m** presenta las correlaciones más débiles (círculos más pequeños y claros) con respecto a las pruebas de fuerza explosiva como el peso o el disco. Esto confirma que la capacidad aeróbica es una dimensión independiente de la potencia física pura.
+
+**Conclusión técnica:** La presencia de múltiples correlaciones significativas y grupos de variables interconectadas confirma que la matriz de datos no es una matriz identidad. Por lo tanto, el conjunto de datos es idóneo para la reducción de dimensionalidad mediante el **Análisis de Componentes Principales (ACP)**.
+
+
+```{r}
+library(psych)
+
+cortest(R,n1=nrow(dec_resc))
+```
+
+Para justificar la aplicabilidad del Análisis de Componentes Principales, se ha realizado un test de la matriz de correlaciones (Test de esfericidad). El estadístico Chi-cuadrado obtenido es de 70.85 con 45 grados de libertad, arrojando un p-valor de 0.0083. Al ser este valor inferior al nivel crítico de 0.05, se rechaza la hipótesis de independencia de las variables. Por tanto, se confirma la existencia de una estructura de correlación significativa entre las pruebas del decatlón, lo que valida técnicamente la ejecución del PCA para reducir la dimensionalidad de los datos.
+
+## 1.2. Análisis de autovalores y determinación del número de componentes principales (métodos numéricos y gráficos)
+
+```{r}
+eigen(R)
+scree(R, factors=F, pc=T)
+```
+
+### Resumen del Análisis del Scree Plot (Gráfico de Sedimentación)
+
+El gráfico de sedimentación se ha utilizado como herramienta visual para decidir el número de componentes principales. Aunque el criterio de Kaiser (autovalores > 1) sugiere la posibilidad de retener hasta cuatro componentes, se ha optado por una **solución de 2 componentes** por las siguientes razones técnicas:
+
+*   **Criterio de Parsimonia:** El objetivo fundamental del ACP es simplificar la complejidad de los datos. Los dos primeros componentes capturan las pendientes más pronunciadas del gráfico, representando la mayor parte de la varianza inicial. Incluir un tercer o cuarto componente añadiría complejidad al modelo sin aportar una ganancia proporcional en la capacidad de explicación.
+*   **Punto de Inflexión (Codo):** Si bien existe un descenso continuo, el salto más significativo en la información capturada ocurre entre los componentes 1 y 2. A partir del tercer componente, la curva comienza a suavizarse, lo que indica que el valor informativo de las dimensiones adicionales es decreciente.
+*   **Interpretabilidad Biológica/Deportiva:** Una estructura de dos dimensiones permite una interpretación clara y directa del rendimiento de los atletas (por ejemplo, separando pruebas de velocidad de pruebas de fuerza). Una mayor dimensionalidad fragmentaría los resultados, dificultando la visualización en el plano bidimensional y la comparación entre individuos.
+
+**Conclusión técnica:** Tras contrastar el Scree Plot con el criterio de parsimonia y los resultados de los tests numéricos (como el de Lawley), se confirma que una **estructura de 2 componentes** es la más adecuada. Esta elección garantiza un equilibrio óptimo entre la simplificación de los datos y la representatividad de las marcas olímpicas.
+
+
+```{r}
+round(eigen(R)$values,2)
+
+library(paran)
+
+pa <- paran(R, iterations=5000, graph=T, color=T, all=TRUE)
+```
+
+```{r}
+library(nFactors)
+nBartlett(R, N=nrow(dec_resc), alpha=0.01,cor=T,details=F)
+```
+
+Además del Scree Plot (gráfico de sedimentación) y el Análisis Paralelo, se realizaron tres pruebas de significación estadística utilizando el paquete `nFactors` para determinar el número óptimo de dimensiones. Los resultados fueron los siguientes:
+
+- El **test de Bartlett** sugirió una solución de 1 componente.
+
+- El **test de Lawley** sugirió una solución de 2 componentes.
+
+- El **test de Anderson** sugirió una solución de 4 componentes.
+
+Considerando que el objetivo de este análisis es lograr un modelo parsimonioso (sencillo) pero a la vez informativo, se seleccionó una **solución de 2 componentes**. Esta decisión está respaldada por el test de Lawley y se alinea con los resultados del Análisis Paralelo. Retener dos componentes permite una interpretación clara de los datos, distinguiendo entre pruebas "explosivas" y pruebas "técnicas/de resistencia", manteniendo al mismo tiempo un alto porcentaje de varianza explicada.
+
+## 1.3. Cálculo y análisis de las contribuciones de las variables y los individuos
+
+```{r, Contribuciones de las variables}
+library("FactoMineR")
+library("factoextra")
+
+# Ejecución del Análisis de Componentes Principales (ACP)
+# Se seleccionan 2 componentes según los criterios analizados previamente
+ACP1 <- PCA(dec_resc, scale.unit = FALSE, ncp = 2, graph = TRUE)
+
+# Comprobación de los autovalores y el porcentaje de varianza explicada
+# Esto ayuda a confirmar si los 2 componentes retenidos son suficientes
+kable(ACP1$eig, caption = "Autovalores y porcentaje de varianza explicada")
+
+# Representación visual de la varianza explicada (Scree Plot)
+fviz_eig(ACP1, addlabels = TRUE, ylim = c(0, 50))
+
+# Tabla de contribuciones de las variables a los componentes principales
+# Permite identificar qué pruebas del decatlón definen cada dimensión
+kable(ACP1$var$contrib, caption = "Contribuciones de las variables a las dimensiones (%)")
+
+# Biplot: Representación conjunta de individuos (atletas) y variables (pruebas)
+# Útil para ver la relación entre los atletas y sus puntos fuertes
+fviz_pca_biplot(ACP1, repel = TRUE,
+                col.var = "#2E9FDF", # Color para las variables
+                col.ind = "#696969"  # Color para los individuos
+)
+
+```
+
+
+## 1.4. Obtención e interpretación de las representaciones gráficas de las variables
+
+```{r}
+# Gráfico del círculo de correlaciones (Mapa de variables)
+# Muestra la relación entre las variables y los componentes principales
+fviz_pca_var(ACP1)
+
+# Extracción de las correlaciones de las variables con los componentes
+library("corrplot")
+ACP1$var$cor
+
+# Visualización de la matriz de correlación entre variables y ejes
+# Los coeficientes (addCoef.col=T) ayudan a identificar la fuerza de la relación
+corrplot(ACP1$var$cor, title = "Correlaciones entre variables y dimensiones", addCoef.col=T)
+
+# Análisis de la calidad de representación (Cos2)
+# El Cos2 indica qué tan bien está representada cada variable en un eje específico
+fviz_cos2(ACP1, choice = "var", axes = 1)      # Calidad en la Dimensión 1
+fviz_cos2(ACP1, choice = "var", axes = 2)      # Calidad en la Dimensión 2
+fviz_cos2(ACP1, choice = "var", axes = 1:2)    # Calidad total en el plano 1-2
+
+# Cálculo del porcentaje de varianza no explicada (error de representación)
+# Se calcula como (1 - suma de los cos2 de los dos primeros ejes) * 100
+(1 - rowSums(ACP1$var$cos2[, 1:2])) * 100
+
+# Gráfico de variables coloreado por su calidad de representación (Cos2)
+# Las variables en rojo están muy bien representadas; las azules, peor representadas
+fviz_pca_var(ACP1, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE
+             )
+
+# Visualización de las contribuciones de las variables a cada componente
+# Ayuda a ver qué pruebas "pesan" más en la construcción de cada eje
+corrplot(ACP1$var$contrib, is.corr=FALSE, addCoef.col=T)
+
+# Gráfico de barras de las contribuciones (Top 10 variables)
+# La línea roja discontinua indica la contribución media esperada
+fviz_contrib(ACP1, choice = "var", axes = 1, top = 10) # Contribución al Eje 1
+fviz_contrib(ACP1, choice = "var", axes = 2, top = 10) # Contribución al Eje 2
+
+# Descripción automática de las dimensiones
+# Identifica qué variables están más correlacionadas con cada eje de forma significativa
+dimdesc(ACP1, axes = c(1,2), proba = 0.05)
+```
+
+## 1.5. Obtención e interpretación de las representaciones gráficas de los individuos
+
+```{r, Contribuciones de los individuos}
+# Acceso a los resultados detallados de los individuos
+# Incluye coordenadas, calidad de representación (cos2) y contribuciones
+ACP1$ind
+
+# Representación de los individuos (atletas) en el mapa del ACP
+# Se colorean los individuos según su calidad de representación (cos2)
+# Los atletas en rojo están mejor representados en este plano que los azules
+fviz_pca_ind(ACP1, col.ind = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE # Evita el solapamiento de los nombres
+             )
+
+# Gráfico de las contribuciones de los individuos a los dos primeros ejes (1 y 2)
+# La línea roja discontinua indica la contribución media esperada
+fviz_contrib(ACP1, choice = "ind", axes = 1:2)
+
+# Gráfico de contribución de los individuos específicamente a la Dimensión 1
+# Identifica qué atletas son los que más influyen en el primer componente
+fviz_contrib(ACP1, choice = "ind", axes = 1)
+
+# Gráfico de contribución de los individuos específicamente a la Dimensión 2
+# Identifica a los atletas que más definen el segundo componente
+fviz_contrib(ACP1, choice = "ind", axes = 2)
+```
+
+## 1.6. Integración de elementos suplementarios: análisis de la puntuación final e inclusión de los registros de Jorge Ureña (Campeón de España)
+
+```{r}
+jorge_urena_sin_total <- c(10.78, 7.35, 14.42, 2.04, 48.39, 14.00, 39.37, 4.9, 64.00, 264)
+
+total_JU <- 8381
+```
+
+
+
+
+# Ejercicio 2
+
+Los datos del fichero **Clientes** contiene para una serie de individuos de un banco sus datos personales sobre morosidad y riesgo de impago. Se desea mediante componentes principales ver como se asocian las variables estudiadas.
+
+
+## 2.1. Comprobación del fichero de datos y análisis de las correlaciones.
+
+```{r}
+
+clientes <- as.data.frame(read_excel("clientes.xlsx"))
+rownames(clientes) <- clientes[[1]]
+clientes <- clientes[,-1]
+clientes$educacion <- as.factor(clientes$educacion)
+clientes$Direccion <- as.factor(clientes$Direccion)
+
+colSums(is.na(clientes)) # Comprobamos si hay datos faltantes.
+```
+
+```{r}
+
+str(clientes)
+
+summary(clientes)
+
+plot(clientes)
+```
+
+```{r}
+clientes_num <- subset(clientes, select = -Direccion)
+
+#boxplot(clientes_num)
+```
+
+```{r}
+clientes_num$educacion <- as.numeric(clientes_num$educacion)
+clientes_num_rescaled <- scale(clientes_num)
+
+boxplot(clientes_num_rescaled)
+```
+
+```{r}
+# Cálculo de la matriz de correlación de Pearson
+R <- cor(clientes_num_rescaled, method="pearson")
+R
+
+# Creación de un gráfico de la matriz de correlación (parte inferior)
+matrix_cor <- cor(clientes_num_rescaled) 
+
+# Personalización del gráfico de correlación
+col_custom <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))(200)
+
+corrplot(matrix_cor, 
+         method = "color",          
+         type = "lower",            
+         order = "original", 
+         col = col_custom,          
+         addCoef.col = "black",      
+         tl.col = "black",          
+         tl.srt = 45,                
+         diag = TRUE,               
+         mar = c(0,0,2,0), 
+         title = "Matriz de Correlación")
+
+```
+
+```{r}
+cortest(R, n1 = nrow(clientes_num_rescaled))
+```
+
+
+**Interpretación de la matriz de correlación**
+
+- Años de empleo e ingresos (0,62): es la correlación más fuerte, cuantos más años de experiencia laboral se tienen, más altos tienden a ser los ingresos.
+
+- Edad y años de empleo (0,55): a medida que aumenta la edad, aumenta la antigüedad laboral.
+
+- Edad e ingresos (0,47): la edad también es un buen indicador de los ingresos, aunque menos preciso que la experiencia directa en el campo.
+
+
+
+- Ingresos y deuda (0,53 - 0,59): quienes ganan más tienden a tener (o utilizar) líneas de crédito más elevadas.
+
+- Correlación entre deudas (0,61): quienes tienen un saldo elevado en una tarjeta tienden a tenerlo también en la otra.
+
+- Dependencia de las tarjetas (0,48 - 0,53): la relación deuda/ingresos se ve influida casi exclusivamente por el saldo de las tarjetas de crédito.
+
+- Independencia del ingreso (-0,03): El nivel de ingresos no influye en la relación deuda/ingreso, ganar más no significa necesariamente estar menos endeudado en proporción.
+
+
+- Educación: El nivel de educación tiene un impacto muy débil en todas las demás variables.
+
+
+Se ha realizado un test sobre la matriz de correlaciones para verificar la idoneidad del PCA. Dado que el p-valor es inferior a 0.05 (Probability < 0) y el valor de Chi-cuadrado es elevado (3178.79), rechazamos la hipótesis nula de que las variables no están correlacionadas. Esto confirma que existe una estructura de correlación significativa en los datos de los clientes, lo cual justifica plenamente el uso del Análisis de Componentes Principales para reducir la dimensionalidad.
+
+## 2.2. Análisis de los autovalores y determinación del número de componentes principales a extraer mediante métodos numéricos y gráficos.
+
+
+```{r}
+eigen(R)
+```
+
+**Método Gráfico (Scree Plot)**
+
+Siguiendo el criterio de Kaiser (autovalores > 1), el gráfico sugiere extraer 3 componentes. El test del codo (Elbow rule) también muestra una estabilización clara a partir de la tercera componente.
+
+```{r}
+scree(R, factors = F, pc = T)
+round(eigen(R)$values,2)#redondeo
+```
+
+
+```{r}
+# Análisis paralelo con 5000 iterazioni para validar el número de ejes
+# Regla: mantener el componente si el valor Real (Ev) es mayor que el Simulado (RndEv)
+RR <- paran(R, iterations=5000, graph=TRUE, color=TRUE)
+
+# Comparación de vectores principales
+confronto <- cbind(
+  Real_Ev   = RR$Ev, 
+  Random_Ev = RR$RndEv, 
+  Adjusted  = RR$AdjEv, 
+  Bias      = RR$Bias
+)
+
+rownames(confronto) <- paste0("PC", 1:nrow(confronto))
+print(round(confronto, 3))
+```
+
+**Métodos Numéricos**
+
+Los tests de Bartlett, Anderson y Lawley sugieren mantener 6 componentes. Esto se debe probablemente al gran tamaño de la muestra, que detecta significación estadística incluso en variaciones muy pequeñas.
+
+```{r}
+nBartlett(R, N=nrow(clientes_num_rescaled), alpha=0.01, cor=T, details=F)
+```
+
+**Decisión Final**
+
+Dado que el objetivo del PCA es la reducción de dimensiones y la interpretabilidad, se decide mantener 3 componentes. Estos recogen la mayor parte de la varianza, mientras que las componentes 4 a 6, aunque estadísticamente significativas, aportan muy poca información práctica (varianza residual).
+
+```{r}
+num_comp = 3
+```
+
+## 2.3. Cálculo y análisis de las contribuciones a las variables y los individuos.
+
+```{r}
+
+ACP <- PCA(clientes_num_rescaled, scale.unit = FALSE, ncp = num_comp, graph = FALSE)
+
+kable(ACP$eig)
+
+# Gráfico de sedimentación
+fviz_eig(ACP, addlabels = TRUE, ylim = c(0, 70))
+
+kable(ACP$var$contrib)
+
+kable(ACP$ind$contrib)
+
+```
+
+
+**Contribuciones de las Variables**
+
+  En la Dim.1: prevalecen variables como Ingreso y uso de tarjetas de crédito.
+  Quienes obtienen puntuaciones altas aquí suelen tener ingresos elevados, mucha experiencia laboral y un uso activo de varias tarjetas de crédito.
+  Nos dice cuánto ganas y cuánto crédito utilizas.
+  
+
+  En la Dim.2: la relación Ratioingresodeuda es la variable principal,  seguida de la edad y los años de empleo.
+  Define cuánto «pesa» la deuda de una persona en comparación con lo que gana. Nos dice cuánto debes en función de tu edad.
+  
+  En la Dim.3: la educación es la variable principal , donde hemos visto antes que no lleva a una gran correlación con las variables anteriores.
+  Nos dice cuán instruida está una persona, independientemente del resto.
+
+
+
+**Contribuciones de los individuos**
+
+
+Los individuos que destacan según la dimensión de referencia son los casos extremos (outliers) de la dimensión x.
+
+Dim.1 -> personas con ingresos muy altos y un uso masivo de tarjetas de crédito.
+Dim.2 -> personas muy endeudadas.
+Dim.3 -> personas con un alto nivel educativo.
+
+
+
+
+
+
+## 2.4. Obtención e interpretación de las representaciones gráficas sobre las variables.
+
+```{r}
+# Variables coloreadas por su calidad de representación (cos2)
+fviz_pca_var(ACP, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE
+)
+
+
+# Matriz de contribuciones de las variables a los ejes
+corrplot(t(ACP$var$contrib), is.corr=FALSE, addCoef.col=TRUE)
+
+# Top contribuciones a la Dimensión 1
+fviz_contrib(ACP, choice = "var", axes = 1, top = 10)
+
+# Top contribuciones a la Dimensión 2
+fviz_contrib(ACP, choice = "var", axes = 2, top = 10)
+
+# Top contribuciones a la Dimensión 3
+fviz_contrib(ACP, choice = "var", axes = 3, top = 10)
+
+# Variables más significativas por eje
+dimdesc(ACP, axes = c(1,2,3), proba = 0.05)
+
+
+```
+
+Profundizando en el análisis de las variables, obtenemos  una nueva observación.
+
+En la Dim.1, no se observa nada relevante: a medida que aumentan la edad, los años de trabajo y los ingresos, aumenta el uso de tarjetas de crédito.
+
+En la Dim.2, quienes obtienen una puntuación alta en esta dimensión tienen muchas deudas , pero son jóvenes, con poca experiencia laboral y unos ingresos más bajos.
+
+En Dim.3, quienes han estudiado mucho  tienden a tener menos años de experiencia laboral y un nivel de endeudamiento ligeramente inferior.
+
+
+
+
+
+
+
+
+## 2.5. Obtención e interpretación de las representaciones gráficas sobre los individuos: ¿qué ocurre cuando el tamaño de muestra es muy grande?
+
+
+```{r}
+# Mapa de individuos por calidad de representación
+fviz_pca_ind(ACP, 
+             col.ind = "cos2", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE,
+             geom = "point")
+
+# Gráfico Biplot (individuos + variables)
+fviz_pca_biplot(ACP, 
+                # Rimuove le etichette degli individui (usa solo i punti)
+                geom.ind = "point", 
+                
+                #  Colori ad alta evidenza
+                col.var = "red",          # Variabili in rosso acceso
+                col.ind = "steelblue",        # Individui in nero
+                alpha.ind = 0.3,          # Trasparenza per gestire la sovrapposizione
+                
+                #  Estetica delle frecce
+                arrowsize = 1, 
+                labelsize = 5,            # Dimensione del testo delle variabili
+                
+                #  Titoli e pulizia
+                title = "Mapa PCA: Variables y individuos",
+                repel = TRUE              # Evita sovrapposizione nomi variabili
+)
+
+
+
+```
+
+
+Cuando el tamaño de la muestra es muy grande, se produce un fenómeno denominado **sobreploteo**.
+
+- Los puntos se superponen entre sí, lo que hace imposible distinguir a los clientes individuales.
+
+- Los valores atípicos (outliers) son los únicos que siguen siendo fáciles de leer, ya que los puntos están aislados, lejos de la masa central.
+
+Para ayudarnos a interpretar gráficamente dónde se sitúan los individuos, los hemos combinado con las variables para tener una idea más clara de dónde se concentran.
+
+
+Al hacer los puntos semitransparentes, las zonas más oscuras indicarán dónde se concentra la mayor parte de la población.
+
+Además, en estos casos no es importante fijarse en el punto individual, sino en cómo es la nube de puntos en su conjunto y a qué variables se acerca más.
+
+En nuestro caso, podemos observar que la mayoría se comporta como el cliente «medio», mientras que los valores atípicos son individuos aislados que podrían haber alterado el gráfico, ya que tenemos valores extremos.
+
+
+# Ejercicio 3
+
+## 3.1 Comprobar el fichero de datos y analizar las correlaciones.
+
+```{r}
+datos <- read_xlsx("mandibula.xlsx", na = "?")
+
+# Analicemos la estructura de las variables
+str(datos)
+
+# Conversión de variables a tipos numéricos y factor
+datos$peso <- as.numeric(datos$peso)
+datos$anchura <- as.numeric(datos$anchura)
+datos$temporal  <- as.numeric(datos$temporal)
+datos$masetero <- as.numeric(datos$masetero)
+datos$longitud <- as.numeric(datos$longitud)
+datos$species <- as.factor(datos$species)
+
+# Redondeo de las columnas numéricas a 2 decimales
+datos[, sapply(datos, is.numeric)] <- round(datos[, sapply(datos, is.numeric)], 2)
+
+# Visualización de las primeras filas con kable
+kable(head(datos))
+ 
+
+# Conteo del número de filas duplicadas
+n_duplicados <- sum(duplicated(datos))
+n_duplicados
+
+# Verificación de valores faltantes
+sum(is.na(datos))
+
+
+# Eliminación de valores NA
+datos <- na.omit(datos)
+
+# Verificación de valores faltantes
+colSums(is.na(datos)) 
+
+# Selección de variables numéricas para el análisis
+datos_num <- datos[sapply(datos, is.numeric)]
+
+kable(head(datos_num))
+
+
+```
+
+- Para convertir las variables hemos tenido que eliminar algunas observaciones debido a los NA generados durante la conversión.
+
+```{r}
+# Generación de una matriz de gráficos de dispersión entre todas las variables
+plot(datos_num)
+
+# Estandarización de los datos (media 0 y varianza 1) para comparar variables diferentes
+datox <- scale(datos_num)
+
+kable(head(datox))
+
+# Visualización de la distribución mediante diagrama de caja
+boxplot(datox)
+
+# Cálculo de la matriz de correlación de Pearson
+R <- cor(datox, method="pearson")
+kable(R)
+
+# Creación de un gráfico de la matriz de correlación (parte inferior)
+matrix_cor <- cor(datox) 
+
+# Personalización del gráfico de correlación
+col_custom <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))(200)
+
+corrplot(matrix_cor, 
+         method = "color",          
+         type = "lower",            
+         order = "original", 
+         col = col_custom,          
+         addCoef.col = "black",      
+         tl.col = "black",          
+         tl.srt = 45,                
+         diag = TRUE,               
+         mar = c(0,0,2,0), 
+         title = "Matriz de Correlación")
+
+# Verificación y validación de la matriz de correlación
+cortest(R, n1=130)
+
+```
+
+
+La Matriz de Correlación nos sugiere:
+
+- **Correlación Positiva Global**: Existe una fuerte correlación positiva entre todas las variables. Al aumentar una dimensión, las demás tienden a aumentar proporcionalmente. El aparato masticatorio (masetero, temporal, carnasial) evoluciona y crece en estrecha coordinación con las dimensiones totales del cráneo (anchura, longitud).
+
+- **Relaciones más fuertes (r > 0.90)**:
+
+  Anchura y Longitud (0.914): Indica que las dimensiones del cráneo mantienen una proporción muy constante.
+
+  Anchura y Temporal (0.911): La anchura está estrechamente ligada al tamaño del músculo temporal.
+
+  Peso y Masetero (0.909): Existe un vínculo fortísimo entre el peso total y el tamaño del músculo masetero.
+
+- **Relaciones más "débiles"**: El diente Carnasial (el diente carnicero) es el que presenta los valores más bajos (entre 0.72-0.79). 
+  
+  El tamaño de los dientes está menos influenciado por el crecimiento general en comparación con los músculos o los huesos. 
+ 
+  Un animal puede tener un cráneo mucho más grande sin tener necesariamente dientes proporcionalmente gigantescos.
+
+-  **CorTest**: Las variables no son independientes, sino que están fuertemente relacionadas entre sí (rechazamos Ho).
+
+
+
+
+## 3.2 Analizar los autovalores. Determinar el número de componentes principales a extraer mediante métodos numéricos y gráficos. 
+
+
+
+```{r}
+
+# Test de Bartlett para verificar si los datos son idóneos para el análisis factorial
+BB <- cortest(R, n1=145) 
+print(BB)
+
+# Ejecución del ACP reteniendo 2 componentes
+ACP <- dudi.pca(datox, nf=2, scannf = FALSE)
+
+# Resumen del análisis (autovalores y varianza)
+summary(ACP)
+
+# Cálculo de autovalores y autovectores
+eigen(R)
+
+# Redondeo de los autovalores
+round(eigen(R)$values, 2) 
+
+# Visualización del Scree Plot
+scree(R, factors=FALSE, pc=TRUE)
+
+
+```
+
+
+**Irrelevancia estadística**
+
+Según la Inercia Proyectada Acumulada, los primeros 5 ejes ya explican el 99.27% de la varianza total. 
+
+El último eje (Ax6) explicaría solo el 0.73% restante. Según el criterio de Kaiser (autovalores > 1), bastaría con tomar únicamente la primera componente principal.
+
+
+```{r}
+# Test de Bartlett para el número de factores
+B <- nBartlett(R, N=145, alpha=0.01, cor=TRUE, details=FALSE)
+B$nFactors
+
+# Análisis paralelo con 5000 iterazioni para validar el número de ejes
+# Regla: mantener el componente si el valor Real (Ev) es mayor que el Simulado (RndEv)
+RR <- paran(R, iterations=5000, graph=TRUE, color=TRUE)
+
+# Comparación de vectores principales
+confronto <- cbind(
+  Real_Ev   = RR$Ev, 
+  Random_Ev = RR$RndEv, 
+  Adjusted  = RR$AdjEv, 
+  Bias      = RR$Bias
+)
+
+rownames(confronto) <- paste0("PC", 1:nrow(confronto))
+kable(round(confronto, 3))
+
+```
+
+
+**Utilizando criterios más sofisticados**
+
+   El test de Bartlett indica que, aunque la segunda y la tercera componente tengan autovalores pequeños (0.39 y 0.30), siguen siendo estadísticamente         significativas y no fruto del azar.
+
+  El Análisis Paralelo sugiere y confirma que para el ACP es recomendable utilizar 2 componentes. 
+  
+  Dado que no buscamos simplificar excesivamente el modelo, elegimos las n componentes sugeridas por este análisis.
+
+
+
+
+
+## 3.3 Calcular y analizar las contribuciones a las variables y los individuos. 
+
+```{r}
+
+# PCA con 2 componentes sobre datos estandarizados
+ACP2 <- PCA(datox, scale.unit = FALSE, ncp=2, graph = FALSE)
+
+kable(ACP2$eig)
+
+# Gráfico de sedimentación
+fviz_eig(ACP2, addlabels = TRUE, ylim = c(0, 70))
+
+# Contribuciones de las variables
+ACP2$var$contrib
+
+# Gráfico Biplot (individuos + variables)
+fviz_pca_biplot(ACP2, 
+                # Rimuove le etichette degli individui (usa solo i punti)
+                geom.ind = "point", 
+                
+                #  Colori ad alta evidenza
+                col.var = "red",          # Variabili in rosso acceso
+                col.ind = "steelblue",        # Individui in nero
+                alpha.ind = 0.3,          # Trasparenza per gestire la sovrapposizione
+                
+                #  Estetica delle frecce
+                arrowsize = 1, 
+                labelsize = 5,            # Dimensione del testo delle variabili
+                
+                #  Titoli e pulizia
+                title = "Mapa PCA: Variables y individuos",
+                repel = TRUE              # Evita sovrapposizione nomi variabili
+)
+
+```
+
+**Contribuciones de las Variables**
+
+  En la Dim.1, las contribuciones son extremadamente homogéneas (todas entre el 15% y el 18%). Ninguna variable domina; todas las medidas contribuyen casi por igual a esta dimensión.
+
+   En la Dim.2, se define una especialización más específica. Ciertas variables tienen un peso mayor (masetero, peso, temporal, longitud).
+    
+  La variable 'carnasial' apenas tiene peso, lo que sugiere que esta dimensión distingue estrategias alimentarias o adaptaciones funcionales.
+
+
+
+```{r}
+kable(ACP2$ind$contrib)
+```
+
+**Contribuciones de los Individuos**
+
+Podemos notar que los individuos se distinguen en grupos según su contribución en Dim.1 y Dim.2.
+
+  Las observaciones con Dim.1 alta y Dim.2 baja forman un grupo de individuos con huesos anchos, pesados y músculos fuertes.
+
+  Donde Dim.2 > Dim.1, representa individuos con características que divergen de la media.
+    
+    
+
+## 3.4 Obtener e interpretar las representaciones gráficas sobres las variables .
+
+```{r}
+
+# Variables coloreadas por su calidad de representación (cos2)
+fviz_pca_var(ACP2, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE
+)
+
+# Matriz de contribuciones de las variables a los ejes
+corrplot(t(ACP2$var$contrib), is.corr=FALSE, addCoef.col=TRUE)
+
+# Top contribuciones a la Dimensión 1
+fviz_contrib(ACP2, choice = "var", axes = 1, top = 10)
+
+# Top contribuciones a la Dimensión 2
+fviz_contrib(ACP2, choice = "var", axes = 2, top = 10)
+
+# Variables más significativas por eje
+dimdesc(ACP2, axes = c(1,2), proba = 0.05)
+
+```
+
+La interpretación gráfica confirma las hipótesis previas.
+
+
+
+## 3.5 Obtener e interpretar las representaciones gráficas sobres los individuos. 
+
+```{r}
+
+# Mapa de individuos por calidad de representación
+fviz_pca_ind(ACP2, 
+             col.ind = "cos2", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE,
+             geom = "point")
+
+fviz_pca_ind(ACP2, 
+             col.ind = "cos2", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE)
+
+# Contribución de los primeros 50 individuos a la Dimensión 1
+fviz_contrib(ACP2, choice = "ind", axes = 1, top = 50, fill = "steelblue")
+
+# Contribución de los primeros 50 individuos a la Dimensión 2
+fviz_contrib(ACP2, choice = "ind", axes = 2, top = 50, fill = "steelblue")
+
+# Contribución combinada a Dimensión 1 y 2
+fviz_contrib(ACP2, choice = "ind", axes = 1:2, top = 50, fill = "steelblue")
+
+
+
+```
+
+
+La elección de representar las primeras 2 componentes resulta eficaz. 
+
+Solo 2 individuos no están representados correctamente (posibles outliers). 
+
+Se confirma que la Dim.1 por sí sola proporciona la mayor parte de la información.
+
+
+
+## 3.6 Obtener una clasificación mediante la variable especie.
+
+
+```{r}
+
+# Biplot con clasificación por grupos (especies)
+fviz_pca_biplot(ACP2, 
+                col.ind = datos$species,  
+                palette = c("blue", "green", "purple", "orange"), 
+                col.var = "red", 
+                addEllipses = FALSE, 
+                label = "var",        
+                axes = c(1, 2),       
+                title = "Plano Factorial (Biplot) - Clasificación por Especies", 
+                repel = TRUE,
+                geom.ind = "point") + # Fuerza para mostrar solo los puntos para los individuos
+  theme_minimal()
+```
+
+ **Conclusión**
+
+Podemos observar que las 4 especies están bien diferenciadas entre sí en el plano factorial. 
+
+Esto indica que los individuos reflejan fielmente las características morfológicas distintivas de su especie.
