@@ -1,0 +1,927 @@
+---
+title: "Ejercicios de Clustering"
+author: "Jan Żurek y Guido D'Inverno"
+date: "04/2026"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+    toc: true
+    highlight: tango
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# Configuración global de los bloques de código
+knitr::opts_chunk$set(
+  include = TRUE,   # Muestra los gráficos y las tablas 
+  echo = TRUE,      # Muestra el código en el PDF
+  warning = FALSE,  # Oculta los mensajes de advertencia
+  message = FALSE   # Oculta los mensajes de carga
+)
+
+# =======================================================
+# 1. IMPORTACIÓN Y MANIPULACIÓN DE DATOS
+# =======================================================
+library(readxl)               # Lee e importa datos de archivos Excel (.xls y .xlsx)
+library(dplyr)                # Manipulación rápida de datasets (filtros, selecciones, agrupaciones)
+library(tidyr)                # Limpieza y reordenamiento de datos (funciones como pivot_longer/wider para datos "tidy")
+
+# =======================================================
+# 2. ESTADÍSTICAS DESCRIPTIVAS Y EXPLORATORIAS
+# =======================================================
+library(pastecs)              # Análisis espacial/temporal y estadísticas descriptivas básicas (ej. función stat.desc)
+library(modeest)              # Cálculo y estimación de la moda para datos univariados
+library(PerformanceAnalytics) # Herramientas avanzadas para el análisis de rendimiento/riesgo y matrices de correlación visuales
+
+# =======================================================
+# 3. VISUALIZACIÓN GRÁFICA
+# =======================================================
+library(graphics)             # Paquete base de R para gráficos estándar (plot, hist, barplot)
+library(ggplot2)              # Creación de gráficos avanzados y personalizables basados en la "Grammar of Graphics"
+library(GGally)               # Extensión de ggplot2 para combinar varios gráficos (ej. ggpairs para matrices de dispersión)
+library(patchwork)            # Permite combinar y organizar fácilmente varios gráficos ggplot2 en una sola imagen
+
+# =======================================================
+# 4. CORRELACIÓN Y ANÁLISIS DE REDES (NETWORK ANALYSIS)
+# =======================================================
+library(corrplot)             # Visualización gráfica y elegante de matrices de correlación
+library(polycor)              # Cálculo de matrices de correlaciones policóricas, tetracóricas y biseriales
+library(qgraph)               # Visualización de redes y modelos psicométricos (Network Analysis)
+library(igraph)               # Creación, manipulación y análisis de grafos y redes complejas
+
+# =======================================================
+# 5. PRUEBAS ESTADÍSTICAS, SUPUESTOS Y NORMALIDAD
+# =======================================================
+library(car)                  # "Companion to Applied Regression": pruebas de supuestos, ANOVA y transformación de datos
+library(nortest)              # Pruebas de normalidad univariadas para muestras complejas (ej. Anderson-Darling)
+library(mvtnorm)              # Cálculo de probabilidades y cuantiles para la distribución normal multivariante
+library(MVN)                  # Pruebas de normalidad multivariante y detección de valores atípicos (outliers) multivariantes
+library(mvnormtest)           # Extensión de la prueba de Shapiro-Wilk para la normalidad multivariante
+
+# =======================================================
+# 6. ANÁLISIS MULTIVARIANTE: PCA Y ANÁLISIS FACTORIAL
+# =======================================================
+library(psych)                # Funciones para psicometría: estadísticas, análisis factorial exploratorio (EFA) y PCA
+library(FactoMineR)           # Análisis multivariante exploratorio clásico (PCA, MCA, MFA)
+library(factoextra)           # Extracción y visualización elegante de los resultados de los modelos de FactoMineR
+library(GPArotation)          # Algoritmos de rotación para el análisis factorial (ej. varimax, oblimin)
+library(nFactors)             # Índices y reglas para determinar el número correcto de factores/componentes a extraer
+library(paran)                # Implementa el Análisis Paralelo de Horn para la elección del número de factores
+library(MVA)                  # Funciones y datasets relacionados con el análisis multivariante aplicado
+library(biotools)             # Herramientas para biometría y análisis estadísticos multivariantes aplicados
+
+# =======================================================
+# 7. CLUSTERING Y CLASIFICACIÓN
+# =======================================================
+library(cluster)              # Métodos y algoritmos básicos para el análisis de clústeres (k-means, jerárquico, PAM)
+library(NbClust)              # Proporciona decenas de índices para determinar el número óptimo de clústeres
+library(clValid)              # Validación estadística y biológica de resultados de clustering para decidir qué algoritmo usar
+library(dendextend)           # Creación, personalización visual y comparación de dendrogramas (árboles jerárquicos)
+
+# =======================================================
+# 8. CREACIÓN DE REPORTES Y FORMATEO DE TABLAS
+# =======================================================
+library(knitr)                # Generación de reportes dinámicos combinando código R y texto (Markdown/LaTeX)
+library(pander)               # Transforma objetos y salidas de R en tablas y textos formateados (Markdown) listos para reportes
+```
+
+# Ejercicio 1
+
+El fichero cluster.txt contiene datos económicos para 24 paises de la europeos. Se pide realizar un análisis
+cluster para clasificar a los países. Realizarlo por varios métodos
+
+## 1.1. Análisis previos
+
+```{r}
+#Primero procedemos a leer el fichero de datos
+
+datos1 <- read.table("cluster.txt", sep="\t", header = T, dec = ".")
+rownames(datos1) <- datos1$pais
+datos_num <- datos1[, -1]
+
+pander(head(datos_num))
+
+```
+
+```{r,echo = FALSE ,include = FALSE }
+str(datos1)
+```
+
+```{r}
+datos_escalados <- scale(datos_num)
+
+# Verificación de valores faltantes
+pander(colSums(is.na(datos_escalados)))
+```
+
+El conjunto de datos no tiene ningún valor que falte.
+
+
+
+```{r}
+distancias <- dist(datos_escalados, method = "euclidean")
+
+fviz_dist(dist.obj = distancias) + 
+  ggtitle("Mapa de las distancias entre paises")
+```
+
+
+
+## 1.2. Método de clustering y validación del modelo seleccionado 
+
+```{r}
+m <- c("average", "single", "complete", "ward")
+names(m) <- c("average", "single", "complete", "ward")
+
+ac <- function(x){
+  agnes(datos_escalados, method = x)$ac
+}
+
+lapply(m, ac)
+```
+
+Para seleccionar el método de agrupamiento jerárquico más adecuado, hemos calculado el Coeficiente de Aglomeración (AC) para cuatro técnicas diferentes. Este coeficiente mide la calidad de la estructura de clusters identificada, donde valores más cercanos a 1 indican una estructura de agrupamiento más fuerte y definida.
+
+Al comparar los resultados:
+
+- Average: 0.511
+
+- Single: 0.467
+
+- Complete: 0.694
+
+- Ward: 0.755
+
+Se observa que el método de Ward presenta el coeficiente más elevado (0.755). Esto indica que este algoritmo es el que mejor identifica la estructura natural de los datos económicos de los 24 países. Por lo tanto, utilizaremos el método de Ward para realizar el análisis de clusters definitivo y generar el dendrograma.
+
+```{r}
+clusterS <- hclust(distancias, method = "ward.D")
+
+plot(clusterS, main = "Cluster Jerárquico de Países Europeos", 
+     sub = "Método de Ward", xlab = "Países", ylab = "Distancia")
+rect.hclust(clusterS, k = 4, border = 3:6)
+```
+
+```{r}
+fviz_dend(clusterS, k = 4, 
+          cex = 0.6, 
+          type = "phylogenic",
+          repel = TRUE,
+          ggtheme = theme_gray())
+
+grupos <- cutree(clusterS, k = 4)
+
+print(grupos)
+```
+
+
+***Análisis de la Correlación Cofenética***
+
+Para validar la fiabilidad de nuestros dendrogramas, hemos calculado el Coeficiente de Correlación Cofenética. Este índice mide la distorsión que introduce el agrupamiento con respecto a las distancias originales entre los países. Una correlación alta (cercana a 1) indica que el dendrograma es una representación fiel de las distancias reales en los datos económicos.
+
+Como se observa en la tabla anterior, los métodos se ordenan según su capacidad para preservar estas distancias. Generalmente, el método Average suele presentar una correlación más alta, mientras que el método de Ward, aunque es excelente para crear grupos compactos y equilibrados, puede presentar una correlación ligeramente menor debido a su naturaleza matemática.
+
+Esta comparativa nos permite confirmar qué método es el más robusto para nuestra clasificación final.
+
+
+```{r}
+dend1 <- hclust(distancias, method = "complete")
+dend2 <- hclust(distancias, method = "single")
+dend3 <- hclust(distancias, method = "average")
+dend4 <- hclust(distancias, method = "centroid")
+dend5 <- hclust(distancias, method = "ward.D2")
+
+coecof<- cophenetic(clusterS)
+coecof1<- cophenetic(dend1)
+coecof2<- cophenetic(dend2)
+coecof3<- cophenetic(dend3)
+coecof4<- cophenetic(dend4)
+coecof5<- cophenetic(dend5)
+
+risultati_cofenetici <- data.frame(
+  Metodo = c("Ward.D", "Complete", "Single", "Average", "Centroid", "Ward.D2"),
+  Correlazione = c(
+    cor(distancias, coecof),
+    cor(distancias, coecof1),
+    cor(distancias, coecof2),
+    cor(distancias, coecof3),
+    cor(distancias, coecof4),
+    cor(distancias, coecof5)
+    )
+)
+
+risultati_ordinati <- risultati_cofenetici[order(-risultati_cofenetici$Correlazione), ]
+
+panderOptions('table.split.table', Inf)
+pander(risultati_ordinati, caption = "Comparación de la correlación cofenética por método de enlace")
+```
+
+
+***Interpretación de los Resultados de Correlación Cofenética***
+
+Los resultados muestran que el método de Centroide (0.8433) y el método Average (0.8330) poseen la mayor correlación cofenética. Esto significa que estos dos métodos son los que mejor preservan las distancias originales entre los países, ofreciendo una representación gráfica más fiel a la realidad de los datos.
+
+Por otro lado, el método de Ward (0.6116) presenta una correlación significativamente menor. Esto es un comportamiento esperado, ya que el algoritmo de Ward tiende a distorsionar las distancias originales para priorizar la creación de clusters compactos y con una varianza interna mínima.
+
+***Conclusión de la comparativa:***
+
+Aunque el método Average es más fiel geométricamente, para objetivos de clasificación socioeconómica solemos preferir el método de Ward (que obtuvo el mejor Coeficiente de Aglomeración AC anteriormente). Ward permite identificar grupos de países más equilibrados y claramente diferenciados, lo cual es más útil desde el punto de vista del análisis económico, a pesar de su menor correlación cofenética.
+
+
+***Comparación con el Método Divisivo (DIANA)***
+
+Además de los métodos aglomerativos vistos anteriormente, existe el algoritmo DIANA (Divisive Analysis). A diferencia de agnes, que construye los grupos desde abajo hacia arriba, DIANA comienza con todos los países en un único gran cluster y los divide sucesivamente hasta que cada objeto es independiente.
+
+Este enfoque es especialmente útil para identificar grandes estructuras jerárquicas en los datos económicos.
+
+
+```{r}
+cluster_top_down <- diana(datos_escalados, metric = "euclidean" ) #se introduce la matriz de datosprint(cluster4)
+print(cluster_top_down)
+
+plot(cluster_top_down)
+
+fviz_dend(cluster_top_down, cex = 0.5,
+          k = 4, # grupos
+          palette = "jco" # Color
+          )
+
+grp <- cutree(clusterS, k = 4)
+
+fviz_cluster(list(data = datos_escalados, cluster = grp))
+
+```
+
+## 1.3. Comparación entre dos modelos
+
+```{r}
+clustercentroid<- hclust(distancias, method = "centroid")
+clusterward.D <- hclust(distancias, method = "ward")
+plot(clustercentroid)
+plot(clusterward.D)
+```
+
+```{r}
+# creamos los 2 dendogramas
+dendograma1 <- as.dendrogram (clustercentroid)
+dendograma2 <- as.dendrogram (clusterward.D)
+
+#lista con los dos dendogramas
+listadendogramas <- dendlist(dendograma1, dendograma2)
+dendlist(dendograma1, dendograma2) %>%
+  untangle(method = "step1side") %>% #
+  tanglegram()
+
+dendlist(dendograma1, dendograma2) %>%
+  untangle(method = "step1side") %>%
+  entanglement()
+
+```
+
+
+## 1.4. Número optimo de cluster
+
+Para garantizar que nuestra clasificación no depende del azar o de una sola variable, realizamos una validación de estabilidad utilizando el paquete `clValid`. Este análisis compara simultáneamente cuatro algoritmos (`hierarchical`, `kmeans`, `pam` y `diana`) para un rango de 2 a 6 clusters.
+
+El objetivo es identificar qué método produce grupos más robustos cuando se elimina una variable del análisis de forma sucesiva. Las métricas calculadas (APN, AD, ADM y FOM) nos indicarán la consistencia de los grupos. Una puntuación más baja en estas métricas representa una mayor estabilidad, lo que nos permite elegir con rigor científico el número óptimo de grupos y el mejor algoritmo para estos datos económicos.
+
+
+```{r}
+comparar <- clValid(datos_escalados, nClust = 2:6,
+                    clMethods = c("hierarchical","kmeans","pam", "diana"),
+                    method = "ward",
+                    validation = "stability")
+
+pander(optimalScores(comparar))
+```
+
+***Interpretación de la Validación de Estabilidad***
+
+Los resultados de la validación cruzada mediante clValid aportan información fundamental sobre la robustez de nuestra clasificación:
+Predominio de K-means: El algoritmo K-means se muestra como el más estable para este conjunto de datos, liderando tres de las cuatro métricas evaluadas (APN, AD y ADM). Esto sugiere que la partición basada en centroides es muy consistente frente a variaciones en las variables económicas.
+
+Número de Clusters:
+Los índices APN y ADM sugieren que la estructura más sólida y estable se logra con 2 clusters, lo que indica una división macroeconómica primaria muy clara en la muestra de países.
+Por otro lado, los índices AD y FOM (donde destaca el método jerárquico) favorecen una solución de 6 clusters, lo que permitiría una clasificación más detallada y con menor error de predicción.
+Conclusión: Dado que los extremos de estabilidad y precisión se sitúan entre 2 y 6 grupos, la elección de un modelo de 4 clusters (utilizado en los análisis anteriores) representa un equilibrio óptimo. Permite capturar la diversidad económica de los 24 países europeos sin perder la estabilidad estadística que exigen los modelos de clasificación.
+
+
+```{r}
+plot(comparar)
+```
+
+
+
+
+# Ejercicio 2: Análisis Clustering de dataset 'cluster2.txt'
+
+
+## 2.1. Análisis previos
+
+Antes de hacer un análisis de clúster, debemos verificar los datos recopilados y estandarizarlos para evitar que las variables medidas en diferentes escalas dominen el cálculo de distancias.
+
+```{r}
+#Primero procedemos a leer el fichero de datos
+
+datos <-read.table("cluster2.txt",sep="\t",header = T)  
+
+pander(head(datos))
+
+```
+```{r,echo = FALSE ,include = FALSE }
+str(datos)
+```
+
+
+```{r}
+# Converti la prima colonna (provincia) in fattore
+datos$provincia <- as.factor(datos$provincia)
+
+#Converti tutte le altre colonne in numeriche
+datos[, -1] <- lapply(datos[, -1], as.numeric)
+
+# Verifica il risultato
+str(datos)
+```
+
+
+Hemos cambiado la estructura de las variables para evitar complicaciones futuras.
+
+
+
+```{r}
+# Verificación de valores faltantes
+pander(colSums(is.na(datos)))
+```
+
+El conjunto de datos no tiene ningún valor que falte.
+
+
+```{r}
+distancias<-dist(scale(datos[,-1]),method = "euclidean") 
+
+# Visualizza solo le prime 10 righe e colonne, arrotondate a 2 decimali
+round(as.matrix(distancias)[1:10, 1:10], 2)
+
+```
+
+
+La matriz convierte variables complejas en un solo número que resume cuánto se parecen dos sujetos.
+
+
+Análisis gráfico de la matriz de distancias.
+
+
+
+```{r}
+# Visualizzazione grafica della matrice
+fviz_dist(distancias, 
+          gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"),
+          lab_size = 8) + 
+  ggtitle("Mapa de las distancias entre provincias")
+
+```
+
+Ahora con la matriz de distancias podemos hacer el Analisis Cluster. 
+
+
+
+## 2.2. Método de clustering y validación del modelo seleccionado 
+
+
+Para ello, empezaremos por identificar el mejor método de selección de clústeres.
+
+
+```{r}
+m <-c("average","single", "complete","ward")
+names(m)<-c("average","single", "complete","ward")
+ac <-function(x){
+  agnes(datos, method= x)$ac
+}
+lapply(m,ac)
+```
+
+
+El AC de 0.92 nos asegura que las diferencias en los gastos entre provincias no son aleatorias, sino que siguen patrones lógicos que Ward logra captar casi perfectamente.
+
+
+Usaremos el método de Ward.
+
+
+```{r}
+clusterS <-hclust(distancias, method="ward.D")
+plot(clusterS)
+```
+
+
+Sin embargo, verificamos si es el método correcto mediante otro procedimiento, la **Correlación Cofenética**.
+
+Vamos a ver qué tipo de "conexión" (ward, soltero, promedio, etc.) deforma menos la realidad matemática original.
+
+
+```{r}
+dend1 <- hclust(distancias, method = "complete")
+dend2 <- hclust(distancias, method = "single") 
+dend3 <- hclust(distancias, method = "average") 
+dend4 <- hclust(distancias, method = "centroid")
+dend5 <- hclust(distancias, method = "ward.D2") 
+
+coecof<- cophenetic(clusterS) 
+coecof1<- cophenetic(dend1) 
+coecof2<- cophenetic(dend2) 
+coecof3<- cophenetic(dend3) 
+coecof4<- cophenetic(dend4) 
+coecof5<- cophenetic(dend5) 
+
+# Creiamo un data frame con i risultati (estraendo i valori numerici dalla tua lista)
+risultati_cofenetici <- data.frame(
+  Metodo = c("Ward.D", "Complete", "Single", "Average", "Centroid", "Ward.D2"),
+  Correlazione = c(
+    cor(distancias, coecof),
+    cor(distancias, coecof1),
+    cor(distancias, coecof2),
+    cor(distancias, coecof3),
+    cor(distancias, coecof4),
+    cor(distancias, coecof5)
+  )
+)
+
+# Ordiniamo il data frame in base alla correlazione (decrescente)
+risultati_ordinati <- risultati_cofenetici[order(-risultati_cofenetici$Correlazione), ]
+
+# Rappresentazione grafica della tabella con pander
+panderOptions('table.split.table', Inf) # Impedisce alla tabella di spezzarsi
+pander(risultati_ordinati, caption = "Comparación de la correlación cofenética por método de enlace")
+
+```
+
+En este tipo de comparación, Ward ya no es el método más representativo.
+
+
+```{r}
+plot(dend4)
+```
+
+
+El mejor resultado en este caso es 'Centroid', esto porque Ward no intenta preservar las distancias originales, sino minimizar la varianza interna a los grupos.
+
+
+Ahora vamos a hacer una correlación adicional, **Inter-Dendrogram Correlation**, comparando los 6 árboles entre sí, midiendo cuán similar es la topología de los árboles.
+
+
+```{r}
+d <- as.dendrogram(hclust(distancias, method = "ward.D2") ) 
+d1 <- as.dendrogram(hclust(distancias,method = "complete") ) 
+d2 <- as.dendrogram(hclust(distancias,method = "single") )
+d3 <- as.dendrogram(hclust(distancias,method = "average") )
+d4 <- as.dendrogram(hclust(distancias,method = "centroid")) 
+d5 <- as.dendrogram(hclust(distancias,method = "ward.D")) 
+dend_list <- dendlist("ward.d"=d, "Complete" = d1, "Single" = d2,  
+                      "Average" = d3, "Centroid" = d4, "ward.D"=d5)
+corelaciones <- cor.dendlist(dend_list) 
+pander(round(corelaciones, 2)) 
+
+```
+
+
+
+Los métodos Ward, Complete y Average coinciden ampliamente en la clasificación de las provincias mientras que métodos como Single y Centroid se diferencian marcadamente siguiendo una lógica de agrupación alternativa.
+
+
+```{r}
+# Miglioramento del grafico delle correlazioni tra dendrogrammi
+corrplot(corelaciones, 
+         method = "color",           
+         type = "lower",             
+         addCoef.col = "black",     
+         tl.col = "black",           
+         tl.srt = 45,                
+         diag = FALSE,               
+         col = COL2("RdBu", 10), 
+         title = "\n Similitud de los métodos de agrupación",
+         mar = c(0,0,1,0))           
+```
+
+
+
+
+## 2.3. Comparación entre dos modelos  
+
+Comparamos los dos modelos propuestos para ver si tienen alguna divergencia estructural.
+
+```{r}
+set.seed(136) # Seme aggiornato al tuo anno attuale
+
+# Estrazione del campione
+indici_campione <- sample(1:nrow(datos), 31) 
+muestra_datos <- datos[indici_campione, -1] # Prendiamo le righe e togliamo la colonna 1 
+
+
+distancias2 <- dist(scale(muestra_datos), method = "euclidean")
+
+
+clustermuestra1 <- hclust(distancias2, method = "centroid") 
+clustermuestra2 <- hclust(distancias2, method = "ward.D2") 
+
+#  Conversione in dendrogrammi
+dend_centroid <- as.dendrogram(clustermuestra1)
+dend_ward     <- as.dendrogram(clustermuestra2)
+
+
+# Creazione della lista e ottimizzazione 
+
+dl_optimized <- dendlist(dend_centroid, dend_ward) %>% 
+  untangle(method = "step1side") 
+
+
+#  Miglioramento Grafico del Tanglegram (Versione Ordinata)
+dl_optimized %>% 
+  tanglegram(
+    main_left = "Metodo Centroide", 
+    main_right = "Metodo Ward",
+    col_lines = c("#1B9E77", "#D95F02", "#7570B3"), # Palette ColorBrewer pulita
+    
+    highlight_distinct_edges = FALSE, 
+    common_subtrees_color_branches = TRUE, # Mantieni i rami comuni colorati
+    lab.cex = 0.65,                    # Leggermente più piccolo per non sovrapporsi
+    lwd = 1.6,                         # Linee un po' più spesse per visibilità
+    margin_inner = 6,                  # Più spazio centrale per nomi lunghi
+    edge.lwd = 0.8                     # Rende i rami degli alberi più sottili
+  )
+
+```
+
+
+```{r}
+# Cálculo de Entanglement (en un objeto ya optimizado)
+entang_val <- dl_optimized %>% entanglement()
+
+# Imprimimos el resultado de manera limpia
+cat("El nivel de Entanglement es:", round(entang_val, 3))
+
+```
+
+    Aproximadamente el 64% de la estructura jerárquica es idéntica en los dos modelos
+    
+    
+Este valor indica una consistencia estructural moderada: aunque los dos algoritmos identifican los macrogrupos principales de manera similar, están observando los datos de diferentes maneras.
+
+La conclusión a la que podemos llegar es que los clústeres principales, independientemente del algoritmo (o método) utilizado, nos dan un resultado similar.
+
+
+
+## 2.4. Selección del número de clústeres
+
+Buscaremos el número óptimo de clústeres comparando varios métodos.
+
+```{r}
+
+datos_final <- datos
+rownames(datos_final) <- datos_final[, 1]
+datos_numeric <- datos_final[, -1] # Teniamo solo i dati numerici
+
+# Standardizzazione
+datos_scaled <- scale(datos_numeric)
+
+comparar <- clValid(datos_scaled, 
+                    nClust = 2:6,
+                    clMethods = c("hierarchical", "kmeans", "pam", "diana"),
+                    method = "average", 
+                    validation = "stability")
+
+pander(optimalScores(comparar))
+
+
+```
+
+
+El análisis indica que la estructura de las provincias es extremadamente sólida si se divide en 2 clústeres (máxima estabilidad según APN y ADM), mientras que una subdivisión en 6 clústeres permite describir mejor los detalles específicos aunque resulte estadísticamente más frágil.
+
+
+
+Gráfico del resultado obtenido
+
+
+```{r}
+plot(comparar)
+```
+
+
+Todavía utilizamos otro método para elegir el número óptimo de clústeres, '**Criterio del Gap**'.
+
+
+```{r, results = "hide" }
+
+# Metodo dell'Elbow (Gomito)
+p1 <- fviz_nbclust(datos_scaled, 
+                   FUNcluster = kmeans, 
+                   method = "wss",
+                   k.max = 7) + 
+      ggtitle("Metodo Elbow (WSS)")
+
+# Metodo della Silhouette
+p2 <- fviz_nbclust(datos_scaled, 
+                   FUNcluster = hcut, 
+                   method = "silhouette", 
+                   k.max = 7) + 
+      ggtitle("Metodo Silhouette")
+
+# Metodo del Gap Statistic
+p3 <- fviz_nbclust(datos_scaled, 
+                   FUNcluster = hcut, 
+                   method = "gap_stat", 
+                   k.max = 7,
+                   ) + 
+      ggtitle("Metodo Gap Statistic")
+
+# Visualizzazione dei grafici
+
+print(p1)
+print(p2)
+print(p3)
+```
+
+
+Todas las mediciones sugieren 2 clústeres como el primer método utilizado.
+
+
+
+
+Visualizamos cómo sería el clustering con k=2
+
+
+```{r}
+
+grp<-cutree(clusterS,k= 2)
+
+# Prendi tutte le 51 province, ordinale e mostrane 5
+
+completo <- data.frame(Provincia = datos[, 1], Cluster = grp)
+
+
+pander(head(completo[completo$Cluster == 1, ], 5))
+
+pander(head(completo[completo$Cluster == 2, ], 5))
+
+
+```
+
+
+```{r}
+# Creiamo un piccolo data frame per una resa estetica migliore
+riepilogo <- data.frame(
+  Cluster = c("1", "2"),
+  `N Provincias` = as.numeric(table(grp))
+)
+
+pander(riepilogo, justify = "left")
+```
+
+
+
+Podemos observar que las provincias en el clúster 2 son más del doble que en el clúster 1.
+
+
+
+
+Análisis gráfico 
+
+
+```{r}
+# Fondamentale: assegniamo i nomi delle province all'oggetto cluster
+clusterS$labels <- datos[, 1]
+
+fviz_dend(clusterS, k = 2, 
+          cex = 0.6, 
+          type = "rectangle", 
+          k_colors = c("#E41A1C", "#377EB8"), 
+          rect = TRUE,           
+          rect_border = "cluster", 
+          rect_fill = TRUE,      
+          ggtheme = theme_minimal(),
+          main = "Dendrograma rectangular")
+
+
+
+fviz_dend(clusterS, k = 2, 
+          cex = 0.7, 
+          type = "circular", 
+          k_colors = c("#E41A1C", "#377EB8"),
+          ggtheme = theme_gray(),
+          main = "Dendrograma Circular")
+
+ 
+
+fviz_dend(clusterS, k = 2, 
+          cex = 0.8, 
+          type = "phylogenic", 
+          ggtheme = theme_gray(),
+          k_colors = c("#E41A1C", "#377EB8"),
+          main = "Dendrograma filogenético")
+ 
+
+# Generiamo il grafico dei cluster
+  rownames(datos_numeric) <- datos[, 1]
+
+
+fviz_cluster(list(data = datos_numeric , cluster = grp),
+             geom = c("point", "text"), # Mostra sia il punto che il nome
+             repel = TRUE,              # FONDAMENTALE: evita che i nomi si sovrappongano
+             ellipse.type = "convex",   # Crea un perimetro attorno ai gruppi
+             palette = "Set1",          # Colori Rosso/Blu coerenti con il dendrogramma
+             ggtheme = theme_minimal(),
+             main = "Mapa de las provincias españolas")
+ 
+```
+
+
+Podemos concluir que el Cluster 1 representa las provincias que representan el Motor Económico e Industrial, mientras que el Cluster 2 representa la norma del territorio español (españa rural y de servicios).
+
+
+
+
+Ahora busquemos cuántos clústeres a través de un método más preciso, que confunda 30 índices matemáticos diferentes para encontrar el mejor 'k'.
+
+
+```{r}
+ NC<-NbClust(datos_scaled,distance="euclidean",min.nc=2,max.nc=6,method="average",index="kl")
+
+
+pander(round(NC$All.index, 3))
+```
+
+```{r}
+pander(round(NC$Best.nc, 3))
+```
+
+
+El valor más alto está en el clúster 3, lo que significa que la comparación nos lleva a preferir k=3 
+
+
+```{r}
+print(NC$Best.partition)
+```
+
+
+
+
+
+Podemos observar cómo se subdividen los tres grupos:
+
+- **Cluster 1** --> Es el grupo más numeroso, representa la estructura económica y social estándar de la nación.
+
+- **Cluster 2** -->  (Jaén, Salamanca, Badajoz y Ceuta-Melilla) Estas provincias están "diferenciadas" del grupo principal porque tienen valores extremos o muy diferentes.
+
+- **Cluster 3** --> (Madrid, Barcelona, el País Vasco, Cataluña y las islas) Representa el "viejo" Cluster 1 de antes, es decir, las zonas más ricas, industriales y turísticas.
+
+
+
+
+
+
+
+
+Visualizamos cómo sería el clustering con k=3
+
+
+```{r}
+
+grpp<-cutree(clusterS,k= 3)
+
+# Prendi tutte le 51 province, ordinale e mostrane 3
+
+completo <- data.frame(Provincia = datos[, 1], Cluster = grpp)
+
+
+pander(head(completo[completo$Cluster == 1, ], 3))
+
+pander(head(completo[completo$Cluster == 2, ], 3))
+
+pander(head(completo[completo$Cluster == 3, ], 3))
+
+```
+
+Aquí podemos notar cómo la clasificación ha intercambiado el número de los clústeres de la partición anterior, pero su tipo de caracterización permanece.
+
+
+
+```{r}
+# Creiamo un piccolo data frame per una resa estetica migliore
+riepilogo <- data.frame(
+  Cluster = c(" 1 ", " 2 "," 3 "),
+  `N Provincias` = as.numeric(table(grpp))
+)
+
+pander(riepilogo, justify = "left")
+```
+
+
+
+Al dividirlos en tres grupos, tenemos una mejor partición de elementos en cada grupo.
+
+
+
+
+Análisis gráfico 
+
+
+```{r}
+
+fviz_dend(clusterS, k = 3, 
+          cex = 0.6, 
+          type = "rectangle", 
+          k_colors = c("#E41A1C", "#377EB8","green"), 
+          rect = TRUE,           
+          rect_border = "cluster", 
+          rect_fill = TRUE,      
+          ggtheme = theme_minimal(),
+          main = "Dendrograma rectangular")
+
+
+
+fviz_dend(clusterS, k = 3, 
+          cex = 0.7, 
+          type = "circular", 
+          k_colors = c("#E41A1C", "#377EB8","green"),
+          ggtheme = theme_gray(),
+          main = "Dendrograma Circular")
+
+ 
+
+fviz_dend(clusterS, k = 3, 
+          cex = 0.7, 
+          type = "phylogenic", 
+          ggtheme = theme_gray(),
+          k_colors = c("#E41A1C", "#377EB8","green"),
+          main = "Dendrograma filogenético")
+
+
+
+fviz_cluster(list(data = datos_numeric , cluster = grpp),
+             geom = c("point", "text"), # Mostra sia il punto che il nome
+             repel = TRUE,              # FONDAMENTALE: evita che i nomi si sovrappongano
+             ellipse.type = "convex",   # Crea un perimetro attorno ai gruppi
+             palette = "Set1",          # Colori Rosso/Blu/Verde coerenti con il dendrogramma
+             ggtheme = theme_minimal(),
+             main = "Mapa de las provincias españolas")
+ 
+```
+
+
+
+
+
+
+
+
+
+Otro método para elegir k clúster, cálculo del **índice de Dunn** (evalúa si los grupos creados son compactos y están bien separados entre sí).
+
+
+```{r}
+grp2 <- cutree(clusterS, k = 2) # Crea il vettore di appartenenza dividendo l'albero iniziale di Ward in 2 cluster.
+grp3 <- cutree(clusterS, k = 3) # Lo divide in 3.
+grp4 <- cutree(clusterS, k = 4) # Lo divide in 4.
+grp5 <- cutree(clusterS, k = 5) # Lo divide in 5.
+grp6 <- cutree(clusterS, k = 6) # Lo divide in 6.
+
+d2<-dunn(distancias,grp2) # Calcula l'Indice di Dunn (valuta densità vs separazione esterna) per k=2.
+d3<-dunn(distancias,grp3) # Calcula l'Indice di Dunn por k=3.
+d4<-dunn(distancias,grp4) # Calcula l'Indice di Dunn por k=4.
+d5<-dunn(distancias,grp5) # Calcula l'Indice di Dunn por k=5.
+d6<-dunn(distancias,grp6) # Calcula l'Indice di Dunn por k=6.
+
+datos_dum <-cbind(d2,d3,d4,d5,d6) # Unisce i 4 risultati in colonna (cbind = column bind) creando una matrice tabellare.
+
+datos_dummy <- datos_dum[, order(datos_dum, decreasing = TRUE)]
+
+pander(t(datos_dummy), caption = "Clasificación del índice de Dunn")
+
+```
+
+Según el índice de Dunn la mejor subdivisión sería la de k=5, sin embargo es muy sensible a los "puntos aislados".
+
+Podemos tener casos límite que Dunn quisiera aislar, además hay que considerar que la diferencia entre d5 y d2 es irrisoria.
+
+En este punto podemos aceptar los anteriores clústeres k=2 y k=3.
+
+
+
+
+
+
+
+
+**Conclusión** 
+
+
+El número óptimo de clústeres depende de lo que queremos encontrar en nuestra investigación.
+
+Si quisiéramos una distinción clara y clara, entonces k=2 sería la mejor opción.
+
+Si quisiéramos una separación más caracterizada, yendo más al detalle, entonces k=3 es el ideal.
+
+
+
+
