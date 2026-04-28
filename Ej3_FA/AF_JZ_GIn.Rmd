@@ -1,0 +1,1239 @@
+---
+title: "Ejercicios de Análisis Factorial"
+author: "Jan Żurek y Guido D'Inverno"
+date: "03/2026"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+    toc: true
+    highlight: tango
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r setup, include=FALSE}
+# Configurazione globale dei blocchi di codice
+knitr::opts_chunk$set(
+  include = TRUE,   #mostra i grafici e le tabelle 
+  echo = TRUE,      # Mostra il codice nel PDF
+  warning = FALSE,   # Nasconde i messaggi di avviso
+  message = FALSE    # Nasconde i messaggi di caricamento
+)
+
+
+library(dplyr)    
+library(ggplot2)  
+library(GGally)
+library(car)      
+library(MVN)      
+library(psych)    
+library(biotools) 
+library(tidyr)
+library(modeest)
+library(pastecs)
+library(corrplot)
+library(PerformanceAnalytics)
+library(knitr)
+library(qgraph)
+library(mvnormtest)
+library(nortest)
+library(MVN)
+library(paran)
+library(nFactors)
+library(patchwork)
+library(corrplot)
+library(GPArotation)
+library(polycor)
+library(paran)
+library(pander)
+library(nFactors)
+library(FactoMineR)
+library(factoextra)
+library(readxl)
+```
+
+# Ejercicio 1: Análisis Factorial de dataset 'iq.xls'
+
+## 1.3.1. Análisis previos
+
+Al principio, leemos los datos y comprobamos su estructura.
+
+```{r}
+iq <- read_xls("iq.xls", na = "?")
+pander(head(iq))
+pander(summary(iq))
+```
+
+```{r}
+test <- mvn(iq, univariate_test = "SW")
+pander(test$multivariate_normality)
+pander(test$univariate_normality)
+pander(test$descriptives)
+```
+
+Vemos que los datos han superado con éxito la prueba de normalidad multidimensional (Henze-Zirkler) y que el índice de asimetría es pequeño (inferior a 1); por lo tanto, aunque los valores individuales de las variables no siguen una distribución normal, podemos pasar al análisis factorial.
+
+Veamos cómo es la matriz de correlación y su determinante.
+
+```{r}
+R <- cor(iq, method = "pearson")
+corrplot(R, sig.level = 0.05, typ = "lower")
+det(R)
+```
+
+Vemos que el coeficiente determinante es prácticamente nulo y que la matriz de correlaciones muestra correlaciones fuertes, lo que nos permite concluir que el análisis factorial está justificado.
+
+**Prueba Kayser-Meyer-Olkin (KMO)**
+
+```{r}
+KMO(iq)
+```
+
+Vemos que tanto las columnas individuales como el conjunto de datos en su conjunto obtienen una puntuación muy alta en esta prueba (alrededor de 0,9), por lo que estos datos son ideales para realizar un análisis factorial.
+
+## 1.3.2. Determinación del número de factores
+
+Pasemos a determinar el número adecuado de factores para nuestro análisis.
+En primer lugar, veamos cuáles son los valores propios de la matriz de correlaciones. Según el criterio de Kaiser, deberíamos seleccionar tantos factores como valores propios sean mayores que 1.
+
+```{r}
+eigen(R)$values
+```
+
+Hagamos un ACP y veamos qué porcentaje de la información total de la prueba aporta cada componente.
+
+```{r}
+fac <- prcomp(iq, scale.=TRUE, tol=NULL)
+summary(fac)
+```
+
+**Visualización de la varianza**
+
+```{r}
+fac2 <- get_eigenvalue(fac)
+barplot(fac2[,2],
+        main = "Varianzas",
+        xlab = "factores",
+        ylab = "Porcentaje de varianza",
+        col ="blue")
+```
+
+**Scree plots**
+
+```{r}
+fviz_screeplot(fac, ncp = 8, addlabels = TRUE)
+
+fa.parallel(iq, n.obs = nrow(iq), fa = "fa", fm = "ml")
+```
+
+```{r}
+ac <- parallel(subject = nrow(iq), var = ncol(iq), rep = 100, cent = .05)
+nS <- nScree(x = eigen(R)$values, aparallel = ac$eigen$qevpea)
+plotnScree(nS)
+```
+
+Utilizando los métodos anteriores, podemos afirmar sin lugar a dudas que lo mejor es utilizar dos factores.
+
+## 1.3.3. Análisis factorial por Componentes Principales
+
+```{r}
+facCP<-prcomp(iq, scale.=TRUE, tol=NULL)
+summary(facCP)
+```
+
+```{r}
+cargasCP <- matrix(0,8,2)
+for (i in 1:2){
+  cargasCP[,i] <- facCP$rotation[,i] * facCP$sdev[i]
+}
+cargasCP
+
+fa.diagram(cargasCP)
+```
+
+## 1.3.4. Comunalidades
+
+```{r}
+comunalidadCP<-matrix(0,8,2)
+for (i in 1:8)
+  {for (j in 1:2)
+  {comunalidadCP[i,1]=comunalidadCP[i,1]+cargasCP[i,j]^2
+    comunalidadCP[i,2]=1-comunalidadCP[i,1]}}
+comunalidadCP
+```
+
+**Interpretación de Comunalidades y Unicidad**
+
+Los resultados muestran **comunalidades altas** (columna 1), todas situadas por encima de **0.70**. Esto indica que los factores extraídos explican más del 70% de la varianza de cada test original, lo cual es un resultado excelente en psicometría. La variable con mejor ajuste es la primera (0.85).
+
+Por otro lado, la **unicidad** (columna 2) es baja en todas las variables (inferior a 0.30), lo que confirma que se pierde muy poca información y el error es mínimo. 
+
+**En conclusión:** El modelo factorial es muy robusto y representa de forma precisa la estructura de los datos originales de inteligencia.
+
+```{r}
+variablesCP<-get_pca_var(facCP)
+variablesCP$coord[,1:2]
+```
+
+**Interpretación de las Dimensiones (Cargas Factoriales)**
+
+1.  **Dimensión 1 (Factor General):**
+    Presenta cargas muy altas y uniformes (entre **-0.76 y -0.86**) en todas las variables. Esto indica la existencia de un **Factor General de Inteligencia (*g*)**. Todas las pruebas, tanto verbales como espaciales, saturan fuertemente en esta dimensión, lo que demuestra que comparten una base común de capacidad cognitiva.
+
+2.  **Dimensión 2 (Factor de Contraste):**
+    Esta dimensión actúa como un diferenciador entre los dos tipos de habilidades medidas:
+    *   **Habilidades Verbales:** Las variables `vocab1`, `similar1`, `veranal2` y `vocab2` tienen cargas **positivas** (aprox. 0.27 a 0.35).
+    *   **Habilidades No Verbales/Espaciales:** Las variables `designs1`, `matrix1`, `matrix2` y `designs2` tienen cargas **negativas** (aprox. -0.24 a -0.41).
+
+**Conclusión:** Mientras que la Dimensión 1 mide la inteligencia global, la Dimensión 2 divide claramente los tests en dos grupos: **capacidad verbal frente a capacidad manipulativa/espacial**.
+
+```{r}
+var.cos2 <- variablesCP$cor^2
+comunalidadCP2=matrix(0,8,3)
+for (i in 1:8)
+{for (j in 1:2)
+{comunalidadCP2[i,j]=var.cos2[i,j]}
+  comunalidadCP2[i,3]=comunalidadCP2[i,1]+comunalidadCP2[i,2]}
+comunalidadCP2
+# Gráfico Biplot (individuos + variables)
+fviz_pca_biplot(facCP, 
+                # Rimuove le etichette degli individui (usa solo i punti)
+                geom.ind = "point", 
+                
+                #  Colori ad alta evidenza
+                col.var = "red",          # Variabili in rosso acceso
+                col.ind = "steelblue",        # Individui in nero
+                alpha.ind = 0.3,          # Trasparenza per gestire la sovrapposizione
+                
+                #  Estetica delle frecce
+                arrowsize = 0.5, 
+                labelsize = 5,            # Dimensione del testo delle variabili
+                
+                #  Titoli e pulizia
+                title = "Mapa PCA: Variables y individuos",
+                repel = TRUE              # Evita sovrapposizione nomi variabili
+)
+
+# Variables coloreadas por su calidad de representación (cos2)
+fviz_pca_var(facCP, col.var = "red",
+             repel = TRUE
+)
+```
+
+**Interpretación del Círculo de Correlación (PCA)**
+
+El gráfico de variables (Círculo de Correlación) visualiza la relación entre los tests y las dos primeras dimensiones:
+
+1.  **Calidad de la representación:** Todos los vectores (flechas) son largos y llegan cerca del borde del círculo unitario. Esto indica que las dos primeras dimensiones explican muy bien todas las variables (corresponde a las altas **comunalidades** observadas anteriormente).
+
+2.  **Dimensión 1 (Eje X - 66.6%):** Todas las variables se sitúan en el lado izquierdo del eje. Esto confirma un **Factor de Inteligencia General (*g*)**, donde puntuaciones altas en un test tienden a asociarse con puntuaciones altas en los demás.
+
+3.  **Dimensión 2 (Eje Y - 10.5%):** Esta dimensión divide claramente las variables en dos grupos bien definidos por su contenido:
+    *   **Grupo Superior (Verbal):** En el cuadrante superior izquierdo se agrupan los tests de carácter verbal: `vocab1`, `vocab2`, `similar1` y `veranal2`.
+    *   **Grupo Inferior (No Verbal/Espacial):** En el cuadrante inferior izquierdo se agrupan los tests de capacidad manipulativa y matricial: `designs1`, `designs2`, `matrix1` y `matrix2`.
+
+**Conclusión:** El gráfico demuestra una excelente validez de constructo. Los tests que miden habilidades similares se agrupan entre sí, y se observa una clara distinción entre la **aptitud verbal** y la **aptitud espacial/manipulativa**, manteniendo todas una fuerte base común (inteligencia general).
+
+## 1.3.5. Rotaciones
+
+```{r}
+rotacionCP <- varimax(cargasCP, normalize=T)$loadings
+print(rotacionCP,cutoff=0.3)
+```
+
+**Interpretación de la Rotación Varimax**
+
+Tras aplicar la rotación Varimax, se ha logrado una **estructura simple** y clara, donde los dos factores están equilibrados y son fácilmente interpretables:
+
+1.  **Factor 1 (Capacidad Verbal):**
+    Este factor presenta cargas factoriales muy altas (superiores a 0.77) en las variables: `vocab1`, `similar1`, `veranal2` y `vocab2`. Es un factor puramente **verbal**, relacionado con el conocimiento del léxico, sinónimos y analogías. Explica el **39.8%** de la varianza total.
+
+2.  **Factor 2 (Capacidad Espacial y Matricial):**
+    Este factor agrupa las variables: `designs1`, `matrix1`, `matrix2` y `designs2`. Todas presentan cargas elevadas (superiores a 0.73). Representa la **capacidad no verbal**, el razonamiento visual y la resolución de problemas espaciales/rompecabezas. Explica el **37.3%** de la varianza.
+
+**Análisis de la Varianza:**
+La varianza total explicada acumulada es del **77.1%**. Cabe destacar que, a diferencia del análisis inicial, la rotación ha distribuido la importancia de los factores de manera casi equitativa (aprox. 40% y 37%), lo que confirma que ambas dimensiones de la inteligencia tienen un peso similar en este grupo de participantes.
+
+```{r}
+fa.diagram(rotacionCP)
+
+plot(rotacionCP[,1],rotacionCP[,2])
+text(rotacionCP[,1],rotacionCP[,2],labels=names(iq),cex=.7)
+```
+
+**Interpretación del Diagrama de Factores**
+
+El diagrama de estructura confirma de manera visual y clara la validez del modelo de dos factores:
+
+1.  **Estructura Simple:** El gráfico muestra una "estructura simple" perfecta, donde cada variable carga exclusivamente en un solo factor, sin ambigüedades ni cargas cruzadas significativas.
+
+2.  **Configuración del Factor 1 (F1):** Este factor captura las habilidades verbales. Agrupa a las variables **V1, V6, V3 y V5** (pertenecientes a los tests de vocabulario y analogías) con cargas factoriales extremadamente altas, de entre **-0.8 y -0.9**. Esto lo define como el componente de **Inteligencia Verbal**.
+
+3.  **Configuración del Factor 2 (F2):** Este factor representa las habilidades de ejecución. Agrupa a las variables **V8, V2, V4 y V7** (tests de diseño con bloques y matrices) con cargas muy sólidas de entre **-0.7 y -0.8**. Esto lo define como el componente de **Inteligencia Visual/Espacial**.
+
+**Conclusión final:** El análisis factorial ha logrado reducir los 8 tests originales a dos dimensiones fundamentales con una pérdida mínima de información. Los resultados son altamente coherentes con las teorías clásicas de la inteligencia, separando claramente las capacidades lingüísticas de las capacidades lógico-espaciales.
+
+```{r}
+fe <- fa.extend(cor(iq), 2,1:8,8)
+extension.diagram(fe)
+```
+
+**Interpretación del Análisis de Extensión Factorial**
+
+Este gráfico presenta un modelo de **rotación oblicua**, que permite analizar la relación entre los factores y la variable específica `designs2`:
+
+1.  **Correlación entre Factores:** Lo más relevante es la **fuerte correlación (0.8)** entre el factor verbal (MR1) y el factor espacial/ejecutivo (MR2). Esto indica que ambas capacidades no son independientes, sino que están estrechamente vinculadas, lo cual es evidencia de un factor de inteligencia general (*g*).
+
+2.  **Análisis de Extensión (`designs2`):** El test de rompecabezas (`designs2`) se analiza a la derecha como resultado de ambos factores. Su carga de **1.2** respecto a MR2 confirma que es un indicador extremadamente fuerte de la capacidad espacial. El valor superior a 1.0 (caso de *Heywood*) es común en modelos con factores muy correlacionados.
+
+3.  **Estructura del Modelo:** Se mantiene la división clara entre las habilidades lingüísticas (MR1: `vocab`, `similar`, `veranal`) y las manipulativas (MR2: `matrix`, `designs`), demostrando una excelente estabilidad y validez de constructo.
+
+ El modelo demuestra que, aunque existen dos dimensiones cognitivas diferenciadas, estas operan de forma conjunta con una alta interconectividad (0.8).
+
+## 1.3.6. Medidas de consistencia
+
+```{r}
+datos1<-iq[,c("matrix1","matrix2","designs1")]
+datos2<-iq[,c("vocab1","vocab2","similar1", "veranal2")]
+```
+
+```{r}
+alpha(datos1,check.keys=TRUE)$total[1]
+alpha(datos2,check.keys=TRUE)$total[1]
+```
+
+ 
+ **Alpha di Cronbach:** Nos dice cuánto los ítems de un grupo están relacionados entre sí, en nuestro caso tenemos la confirmación definía que las variables de un grupo están midiendo el mismo concepto.
+ 
+
+## 1.3.7. Puntuaciones factoriales
+
+```{r}
+# facCP$x[,1:2]
+plot(facCP$x[,1],facCP$x[,2])
+text(facCP$x[,1],facCP$x[,2],labels=rownames(iq),cex=.7)
+fviz_pca_ind(facCP)
+```
+
+
+
+
+# Ejercicio 2: Análisis Factorial de dataset 'sdq.xls'
+
+
+## 2.3.1. Análisis previos
+
+```{r}
+datos <- read_xls("sdq.xls", na = "?")
+
+glimpse(datos)
+
+table(sapply(datos, class))
+```
+
+
+```{r}
+# Verificación de valores faltantes
+sum(is.na(datos))
+```
+
+El conjunto de datos se importó correctamente y no faltan valores.
+
+Ahora deberíamos probar las hipótesis de normalidad, linealidad y correlación porque estas pruebas sirven para asegurar que los datos tengan una estructura matemática coherente y relaciones lineales robustas, sin las cuales el análisis factorial produciría resultados distorsionados o carentes de significado estadístico.
+
+
+
+```{r}
+test <- mvn(datos,univariate_test = "SW")
+pander(test$univariate_normality)
+pander(test$multivariate_normality)
+```
+
+Sin embargo, los test formales de normalidad no son necesarias porque los datos son ordinales y discretos (escala 1-6), una condición que viola la condición de continuidad requerida por estas pruebas.
+
+
+Podemos comprobar la normalidad a través de Skewness y Kurtosis
+
+```{r}
+# Selezioniamo solo Skewness e Kurtosis (colonne 11 e 12 di describe)
+desc_norm <- describe(datos)[, c("skew", "kurtosis")]
+pander(round(desc_norm, 2))
+```
+
+Casi todas tus variables presentan una **asimetría** (*skewness*) negativa; la cola de la distribución se desplaza hacia la izquierda, lo que implica que la mayoría de los 425 encuestados eligieron las puntuaciones más altas de la escala (por ejemplo, 5-6).
+
+Este análisis adicional nos muestra algunas variables consideradas **"casos críticos"**:
+
+*   **sdq26** (-2.76 - 8.14)
+*   **sdq29r** (-2.59 - 6.26)
+*   **sdq5r** (-1.95 - 2.85)
+
+Las distribuciones de asimetría y curtosis no presentan un rango moderado; al contrario, algunas observaciones superan el umbral de los valores considerados críticos (±2 para la asimetría y ±7 para la curtosis). Esto confirma que las variables no siguen una distribución normal, por lo que es recomendable no utilizar métodos como el de Máxima Verosimilitud en el análisis factorial.
+
+Es aconsejable utilizar Spearman en lugar de Pearson; sin embargo, nosotros queremos analizar la hipótesis de linealidad.
+
+```{r}
+# Cálculo de la matriz de correlación de Pearson
+R <- cor(datos, method="pearson")
+
+#Observando así la matriz vemos que las correlaciones son todas positivas y relativamente altas(>0.3)
+symnum(R)
+
+corrplot(R,sig.level=0.05,typ="lower")
+
+#Aquí vemos que en general las correlaciones son positivas  pero también es dificil sacar conclusiones. Para verificar que son significativas las correlaciones vemos si el determinante es cercano a 0.
+
+det(R)
+
+#Es muy cercano a 0 por tanto es significativa , una última prueba será el test de esfericidad de bartlett
+
+```
+
+
+La matriz presenta muchas correlaciones débiles entre sí; no podemos asumir una correlación lineal clásica (Pearson) con estos datos.
+
+Probablemente existan subgrupos: muchas preguntas correlacionadas entre sí y otras que no tienen correlación alguna.
+
+Un determinante tan bajo podría sugerir problemas de multicolinealidad; para verificar si podemos realizar un análisis factorial, debemos realizar la prueba de esfericidad de Bartlett.
+
+```{r}
+# Verificación y validación de la matriz de correlación
+cortest(R, n1= nrow(datos))
+```
+
+La prueba de Bartlett demuestra que existen correlaciones significativas entre tus 30 variables; los datos son idóneos para ser reducidos en factores.
+Otro análisis gráfico para observar las interconexiones entre variables desde un punto de vista neuronal.
+
+```{r}
+qgraph(R, 
+       layout = "spring", 
+       labels = colnames(datos), 
+       label.scale = FALSE,
+       label.cex = 0.8,
+       node.width = 1.2)
+```
+
+
+El gráfico confirma que hay muchas relaciones con poca correlación, pero también varios grupos de variables muy relacionadas entre sí.
+
+
+
+Para acabar con el análisis previo realizaremos el Test de  Kayser-Meyer-Olkin, para contrastar si el análisis factorial es significativo o no antes de realizarlo.
+
+```{r}
+KMO(datos)
+```
+
+La prueba nos confirma que los datos son sólidos y perfectamente adecuados para llevar a cabo un análisis factorial.
+
+
+
+## 2.3.2 Determinación del número de factores
+
+
+```{r}
+#Primero vamos a calcular los autovalores de la matriz de correlaciones
+eigen(R)$values
+#Usando la regla de Kayser escogeriamos 6 factores ya que es el único autovalor mayor que la unidad.
+
+# Visualización del Scree Plot
+scree(R, factors= TRUE, pc=TRUE)
+
+#También podemos verlo con el pòrcentaje de variable explicada.
+fac<-prcomp(datos,scale.=TRUE,tol=NULL)
+summary(fac)
+
+# Usa facCP che è l'oggetto dove hai salvato i risultati di prcomp
+fviz_screeplot(fac, ncp=10, choice='eigenvalue', addlabels=TRUE) + 
+  geom_hline(yintercept=1, linetype="dashed", color="red") # Linea del criterio di Kaiser
+
+```
+
+
+El criterio de Karsen nos sugiere seis factores; sin embargo, a menudo es impreciso, especialmente con datos ordinarios.
+
+Utilizamos otros criterios para determinar el número de componentes que se deben emplear en el análisis factorial.
+
+
+```{r}
+#Este código realiza un análisis comparativo entre cuatro criterios diferentes (Kaiser, Parallel, OC y AF) para proporcionarle una base estadística sólida y visual sobre la elección del número de factores a extraer
+
+ac<-parallel(subject=nrow(datos),var=ncol(datos),rep=500,cent=.05) 
+nS <- nScree(x=eigen(R)$values, aparallel=ac$eigen$qevpea) 
+pander(nS$Components)
+plotnScree(nS)
+
+```
+
+
+Los demás análisis nos sugieren que analicemos cuatro componentes principales para el análisis factorial.
+
+Dado que el análisis paralelo nos ofrece, preferiblemente, una mejor estimación de los factores que debemos utilizar, emplearemos cuatro factores para nuestro análisis.
+
+
+
+
+## 2.3.3. Análisis factorial 
+
+Comparamos los modelos para ver cuál elijo.
+
+```{r}
+
+# --- Comparación con 4 métodos ---
+
+# mle: Máxima verosimilitud 
+mod_mle   <- fa(datos, nfactors = 4, rotate = "none", fm = "mle")
+
+# minres: Residuo mínimo 
+mod_minres <- fa(datos, nfactors = 4, rotate = "none", fm = "minres")
+
+# pa: Ejes principales 
+mod_pa   <- fa(datos, nfactors = 4, rotate = "none", fm = "pa")
+
+# minchi: Mínimos cuadrados 
+mod_minchi <- fa(datos, nfactors = 4, rotate = "none", fm = "minchi")
+
+# Creamos un marco de datos completo con todos los índices de solidez
+comparar_modelos <- data.frame(
+  Método = c("MLE", "MinRes", "Ejes principales (PA)", "Mínimos cuadrados (MinChi)"),
+  
+  # Error 
+  RMSE = c(mod_mle$RMSEA[1], mod_minres$RMSEA[1], mod_pa$RMSEA[1], mod_minchi$RMSEA[1]),
+  
+  # Solidez Bayesiana (Más bajo/negativo es mejor)
+  BIC = c(mod_mle$BIC, mod_minres$BIC, mod_pa$BIC, mod_minchi$BIC),
+  
+  # Complejidad media (Más cerca de 1 indica factores más claros y distintos)
+  Complexity = c(mean(mod_mle$complexity), mean(mod_minres$complexity), 
+                        mean(mod_pa$complexity), mean(mod_minchi$complexity))
+)
+
+
+# Ordenamos por BIC porque es el indicador más severo de la solidez
+comparar_modelos <- comparar_modelos[order(comparar_modelos$BIC), ]
+
+pander(comparar_modelos, 
+       caption = "Comparación de la solidez: BIC (eficiencia) y Complexidad (pureza)")
+
+```
+
+
+El mejor modelo para el análisis factorial es el de **Máxima Verosimilitud**, sin embargo hemos notado antes que este método es aconsejable cuando hemos satisfecho la hipótesis de normalidad.
+
+Por lo tanto, utilizamos el método de **Mínimos cuadrados**.
+
+
+```{r}
+modelo <- fa(R,
+             nfactors = 4,
+             rotate = "none",
+             fm="minchi") # modelo minimos cuadrados
+```
+
+
+
+## 2.3.4 Comunalidades
+
+```{r}
+round(modelo$communality, 3)
+round(modelo$uniquenesses, 3)
+```
+
+El modelo funciona muy bien para aproximadamente la mitad de los ítems (aquellos con comunalidad >0.40).
+
+Hay que considerar la eliminación de los ítems con comunalidad muy baja (<0.20 o 0.30).
+
+
+**Ítem fuertes**: sdq1 (0.692), sdq18 (0.679) y sdq13 (0.644)  explican aproximadamente el 64-69% de su varianza.
+
+
+**Item débil**: sdq26 (0.113) y sdq27r (0.220) tienen valores muy bajos, lo que significa que los factores extraídos no pueden explicar casi nada de estas preguntas.
+
+
+```{r}
+load <- modelo$loadings[,1:4]
+load
+```
+
+
+**MR1**: Indica competencia y actitud hacia las matemáticas, quien tiene un puntaje alto aquí ama y logra buenos cálculos.
+
+**MR2** : Indica habilidades verbales (inglés y lectura).
+
+**MR3** : Indica autoestima global, quien tiene un puntaje alto aquí, posee una percepción positiva de sí mismo como persona, independientemente de los votos.
+
+**MR4** : Indica dificultad y malestar escolar.
+
+
+```{r}
+plot(load,type="n") # set up plot
+text(load,labels=names(datos),cex=.7)
+```
+
+
+
+## 2.3.5 Rotaciones
+
+```{r}
+rot<-c("none", "varimax", "quartimax", "Promax")
+
+bi_mod <- function(tipo){
+  biplot.psych(fa(datos, nfactors = 4, fm="minchi", rotate = tipo),
+               main = paste("Biplot con rotación ", tipo),
+               col=c(2,3,4), pch = c(21,18))
+}
+sapply(rot, bi_mod)
+```
+
+```{r}
+gra<-function(tipo){
+  fa.diagram(fa(datos,nfactors = 4, fm="minchi", rotate = tipo))
+}
+sapply(rot,gra)
+```
+
+
+
+### Selección de la Rotación Factorial
+
+Tras comparar los diferentes métodos de rotación mediante los biplots, se ha decidido optar por la rotación **Promax**. 
+
+La elección de este método se fundamenta en la naturaleza de los datos analizados. Al tratarse de **variables psicológicas** (conductas, emociones y rasgos sociales), es teóricamente poco probable que los factores sean completamente independientes entre sí. A diferencia de las rotaciones ortogonales (como *Varimax*), que obligan a los factores a no tener relación alguna, la rotación **Promax (oblicua)** permite que los factores correlacionen entre sí.
+
+
+Este enfoque no solo es más coherente desde un punto de vista psicológico, sino que también facilita una **estructura simple** más clara, permitiendo que cada variable se asocie con mayor precisión a su factor correspondiente sin forzar una independencia artificial. Por lo tanto, el modelo basado en la rotación Promax nos ofrecerá la interpretación más realista y fiel a la complejidad del comportamiento humano evaluado.
+
+
+```{r}
+modelo_final <- fa(datos, 
+                   nfactors = 4, 
+                   rotate = "promax", 
+                   fm = "minchi")
+
+print(modelo_final$loadings, cutoff = 0.3, sort = TRUE)
+```
+
+
+```{r}
+fa.diagram(modelo, main = "Diagrama factorial (Rotación Promax)")
+```
+
+
+Se puede observar que al aplicar la rotación, podemos notar que los factores M3 y M4 tienen una influencia mucho menor en comparación con los otros dos.
+
+Sería ideal omitirlos e integrar sus ítems en los dos primeros factores.
+Transformando el análisis factorial en una de interpretación más fácil entre los dos primeros factores claramente distintos entre sí. 
+
+
+
+```{r}
+
+# Factor 1 (Matematica + Autostima Generale): 18 item
+factor1_cols <- c(1, 2, 4, 5, 7, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 28, 29)
+
+# Factor 2 (Verbale/Inglese + Difficoltà di lettura): 10 item
+factor2_cols <- c(3, 6, 8, 9, 12, 15, 18, 21, 24, 30)
+
+# Creazione del vettore per i gruppi (es. per grafici o tabelle successive)
+# Poiché hai 18 item nel Factor 1 e 10 nel Factor 2:
+grupos_variables <- c(rep("Factor 1", 18), rep("Factor 2", 10))
+                      
+# Seleccionamos solo las 28 variables que queremos analizar (excluyendo 26 y 27)
+indice_variabili_finali <- c(factor1_cols, factor2_cols)
+datos_filtrati <- datos[, indice_variabili_finali]
+
+# Ejecutamos PCA solo en estas 28 variables
+res.pca <- PCA(datos_filtrati, ncp = 2, graph = FALSE)
+
+# Definimos el vector de color (ahora la longitud 28 coincide con las columnas de datos_filtrados)
+grupos_variables <- c(rep("Factor 1 (Maths)", 18), 
+                      rep("Factor 2 (Verbal/Inglés)", 10))
+
+# Generemos el biplot
+fviz_pca_biplot(res.pca,
+                geom.ind = "point",
+                col.ind = "steelblue",
+                alpha.ind = 0.3,
+                pointsize = 1.5,
+                
+                col.var = grupos_variables, # Ora le lunghezze corrispondono!
+                palette = "jco",
+                legend.title = "Dimensiones",
+                arrowsize = 0.5,
+                
+                repel = TRUE,
+                labelsize = 3,
+                title = "Mapa Factorial: Estructura de las 28 variables",
+                subtitle = "Análisis basado en 425 respuestas (Esclusi item 26 e 27)"
+) +
+theme_minimal() +
+theme(legend.position = "right")
+```
+
+
+
+
+## 2.3.6 Alpha de Cronbach
+
+```{r}
+# Grupo 1: Matemática (MR1)
+factor1_vars <- datos[, c(1, 4, 7, 10, 11, 13, 16, 19, 22, 25, 28, 29)]
+
+# Grupo 2: Verbal/Inglés (MR2 + Integración MR4)
+factor2_vars <- datos[, c(3, 6, 8, 9, 12, 15, 18, 21, 24, 30)]
+
+# Grupo 3: Autoestima General (MR3)
+factor3_vars <- datos[, c(2, 5, 14, 17, 20, 23)]
+```
+
+**Advertencias** : sdq26 (0.113) y sdq27r (0.220) tienen valores de loading muy bajos, significa que al incluirlos vamos a empeorar lo que es el análisis de los grupos del Alpha de Cronbach, sin añadir ninguna información útil a los grupos.
+
+**Problema de M4** : Tenemos muy pocas preguntas que afectan al grupo que se basa en este factor, contiene solo sdq9r y sdq15r, mejor dirigirlas a los secundo  grupo.(porque el loading es mayor respecto los otras tres)
+
+
+```{r}
+# Análisis del factor 1
+rel_f1 <- alpha(factor1_vars, check.keys = TRUE)
+
+
+# Análisis del factor 2
+rel_f2 <- alpha(factor2_vars, check.keys = TRUE)
+
+
+# Análisis del factor 3
+rel_f3 <- alpha(factor3_vars, check.keys = TRUE)
+
+```
+
+
+```{r}
+cat("Factor 1 (Matemática):   ", round(rel_f1$total$raw_alpha, 3), " ")
+cat("Factor 2 (Verbal/Inglés):  ", round(rel_f2$total$raw_alpha, 3), " ")
+cat("Factor 3 (Autoestima):   ", round(rel_f3$total$raw_alpha, 3), " ")
+```
+
+     El Alfa de Cronbach confirmó la fiabilidad de la estructura factorial propuesta.
+
+
+
+
+
+# Ejercicio 3: Análisis Factorial de dataset 'adhd.xls.'
+
+
+## 3.3.1 Análisis previos
+
+```{r}
+datos <- read_xls("adhd.xls", na = "?")
+
+# Visualización de las primeras filas con kable
+head(datos)
+
+# Analicemos la estructura de las variables
+str(datos)
+
+# Verificación de valores faltantes
+colSums(is.na(datos))
+
+
+```
+El conjunto de datos se importó correctamente y no faltan valores.
+
+Ahora deberíamos probar las hipótesis de normalidad, linealidad y correlación porque estas pruebas sirven para asegurar que los datos tengan una estructura matemática coherente y relaciones lineales robustas, sin las cuales el análisis factorial produciría resultados distorsionados o carentes de significado estadístico.
+
+
+```{r}
+test<-mvn(datos,univariate_test = "SW")
+pander(test$univariate_normality)
+pander(test$multivariate_normality)
+```
+
+
+Sin embargo, los test formales de normalidad no son necesarias porque los datos son ordinales y discretos (escala 0-3), una condición que viola la condición de continuidad requerida por estas pruebas.
+
+Podemos comprobar a través de Skewness y Kurtosis
+
+```{r}
+# Selezioniamo solo Skewness e Kurtosis (colonne 11 e 12 di describe)
+desc_norm <- describe(datos)[, c("skew", "kurtosis")]
+pander(round(desc_norm, 2))
+```
+
+Todas las variables son adecuadas para el análisis factorial, ya que los resultados obtenidos (Skewness entre 0,70 y 1,86 y Kurtosis entre -0,51 y 3,19) se encuentran dentro de los umbrales de tolerancia científicamente aceptados de ±2 para la asimetría y ±7 para la curtosi. garantizando una distribución robusta y sin distorsiones críticas.
+
+Sin embargo, la hipótesis de normalidad no está satisfecha, es preferible no utilizar el método de máxima verosimilitud.
+
+Calculamos la hipótesis de linealidad con la matriz de correlaciones lineales de Pearson
+
+
+
+```{r}
+# Cálculo de la matriz de correlación de Pearson
+R <- cor(datos, method="pearson")
+
+#Observando así la matriz vemos que las correlaciones son todas positivas y relativamente altas(>0.3)
+symnum(R)
+#La maggior parte dei dati ha una correlazione buona, non abbiamo variabili che possiamo trascurare.
+
+
+# Personalización del gráfico de correlación
+col_custom <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))(200)
+
+corrplot(R, 
+         method = "color",          
+         type = "lower",            
+         order = "original", 
+         col = col_custom, 
+         number.digits = 2,
+         addCoef.col = "black",      
+         tl.col = "black",          
+         tl.srt = 45,                
+         diag = TRUE,               
+         mar = c(0,0,2,0), 
+         title = "Matriz de Correlación")
+
+```
+
+
+La matriz de Pearson muestra vínculos sólidos > 0,30, aceptamos que las variables tienen una correlación lineal.
+
+Además, ninguna de las variables ha resultado ser insignificante en las correlaciones, lo que sugiere que no tenemos variables a descuidar.
+
+**Análisis de correlaciones más fuertes**
+
+Podemos distinguir los enlaces en 2 grupos diferentes:
+
+     Impulsividad / Hiperactividad
+
+- **go - fidgets (0.67)**: Es la correlación más alta, indica un vínculo muy fuerte entre el impulso de moverse y la agitación motora.
+
+- **go - talks (0.60)**: La hiperactividad motora también se refleja en la verbal .
+
+- ***go - runs (0.54)**: Una fuerte correlación que vincula la inquietud general con la necesidad física de correr/moverse.
+  
+  
+    Desconcierto / Organización
+    
+- **instruct - organize (0.61)**: quien tiene dificultades para seguir las instrucciones suele tener problemas de organización.
+
+- **instruct - Effort (0.60)**: indica que el esfuerzo mental y la capacidad de seguir indicaciones están fuertemente relacionados.
+
+- **effort - attention (0.59)**: Confirma que la tenacidad en la tarea está estrechamente vinculada a la capacidad de atención.
+
+
+
+```{r}
+
+#Aquí observamos las mismas conclusiones que de manera numérica, pero para verificar que son significativas las correlaciones vemos si el determinante es cercano a 0
+det(R)
+#Es muy cercano a 0 por tanto es significativa
+
+# Verificación y validación de la matriz de correlación
+ cortest(R, n1= nrow(datos)) 
+
+```
+
+El **determinante** de 0,01008 confirma que la matriz de correlación es adecuada para el análisis y no padece multicollinealidad.
+
+
+La **Test de Bartlett** es ampliamente significativa (p<0.001), lo que indica que las correlaciones entre las variables son lo suficientemente fuertes como para hacer posible el análisis factorial, estadísticamente significativo.
+
+
+Para terminar con el análisis previo realizaremos el test de Kayser-Meyer-Olkin, para contrastar si el análisis factorial es significativo o no antes de realizarlo.
+
+
+```{r}
+#Test di Kayser-Meyer-Olkin
+KMO(datos) 
+```
+
+La **Test de Kaiser-Meyer-Olkin** con un Overall MSA de 0,91 indica una excelente adecuación muestral, confirma que los datos están perfectamente estructurados para un análisis factorial robusto y que cada ítem individual contribuye de manera limpia a la medición.
+
+    Hemos verificado todas las hipótesis, podemos proceder al análisis factorial
+
+
+
+## 3.3.2 Determinación del número de factores
+
+
+```{r}
+#Primero vamos a calcular los autovalores de la matriz de correlaciones
+eigen(R)$values
+#Usando la regla de Kayser escogeriamos 2 factores ya que es el único autovalor mayor que la unidad.
+
+# Visualización del Scree Plot
+scree(R, factors= TRUE, pc=TRUE)
+
+#También podemos verlo con el pòrcentaje de variable explicada.
+fac<-prcomp(datos,scale.=TRUE,tol=NULL)
+summary(fac)
+
+# Usa facCP che è l'oggetto dove hai salvato i risultati di prcomp
+fviz_screeplot(fac, ncp=10, choice='eigenvalue', addlabels=TRUE) + 
+  geom_hline(yintercept=1, linetype="dashed", color="red") # Linea del criterio di Kaiser
+
+```
+
+El análisis de los valores propios da lugar a dos interpretaciones:
+
+- El salto entre el primero (5.07) y el segundo (1.22) sugiere que existe un fuerte componente común a todos los ítems.
+
+- El hecho de que el segundo también esté por encima de 1 confirma que los datos se dividen casi con toda seguridad en dos grupos, como se ha supuesto anteriormente.
+
+
+Los dos primeros componentes explican juntos el 62,89% de la varianza total, lo que confirma que una estructura bidimensional es suficiente y sólida para representar los datos.
+
+
+```{r}
+
+#Este código realiza un análisis comparativo entre cuatro criterios diferentes (Kaiser, Parallel, OC y AF) para proporcionarle una base estadística sólida y visual sobre la elección del número de factores a extraer
+
+ac<-parallel(subject=nrow(datos),var=ncol(datos),rep=500,cent=.05) 
+nS <- nScree(x=eigen(R)$values, aparallel=ac$eigen$qevpea) 
+pander(nS$Components)
+plotnScree(nS)
+
+
+```
+
+
+El factor de aceleración sugiere 1 porque el primer factor es dominante, pero la convergencia de todos los demás criterios a 2 confirma que existe una segunda dimensión significativa que merece ser extraída para no perder información valiosa.
+
+
+
+También estimamos estadísticamente mediante los valores del análisis paralelo.(mas rigorosa)
+
+```{r}
+RR <- paran(R, iterations=5000, graph=FALSE, cfa = TRUE ,color=TRUE)
+
+# Comparación de vectores principales
+confronto <- cbind(
+  Real_Ev   = RR$Ev, 
+  Random_Ev = RR$RndEv, 
+  Adjusted  = RR$AdjEv, 
+  Bias      = RR$Bias
+)
+
+rownames(confronto) <- paste0("PC", 1:nrow(confronto))
+pander(round(confronto, 3))
+```
+
+
+El análisis confirma que podemos hacer un buen análisis factorial simplemente tomando los primeros 2 componentes.
+ 
+ **Curiosidad** : PC10 indica que el análisis factorial no necesita todos los componentes para utilizar toda la información, el último componente se convierte en reindonente.
+
+
+
+
+## 3.3.3 Análisis factorial 
+
+Comparamos los modelos para ver cuál elijo.
+
+```{r}
+
+# --- Comparación con 4 métodos ---
+
+# mle: Máxima verosimilitud 
+mod_mle   <- fa(datos, nfactors = 2, rotate = "none", fm = "mle")
+
+# minres: Residuo mínimo 
+mod_minres <- fa(datos, nfactors = 2, rotate = "none", fm = "minres")
+
+# pa: Ejes principales 
+mod_pa   <- fa(datos, nfactors = 2, rotate = "none", fm = "pa")
+
+# minchi: Mínimos cuadrados 
+mod_minchi <- fa(datos, nfactors = 2, rotate = "none", fm = "minchi")
+
+# Creamos un marco de datos completo con todos los índices de solidez
+comparar_modelos <- data.frame(
+  Método = c("MLE", "MinRes", "Ejes principales (PA)", "Mínimos cuadrados (MinChi)"),
+  
+  # Error 
+  RMSE = c(mod_mle$RMSEA[1], mod_minres$RMSEA[1], mod_pa$RMSEA[1], mod_minchi$RMSEA[1]),
+  
+  # Solidez Bayesiana (Más bajo/negativo es mejor)
+  BIC = c(mod_mle$BIC, mod_minres$BIC, mod_pa$BIC, mod_minchi$BIC),
+  
+  # Complejidad media (Más cerca de 1 indica factores más claros y distintos)
+  Complexity = c(mean(mod_mle$complexity), mean(mod_minres$complexity), 
+                        mean(mod_pa$complexity), mean(mod_minchi$complexity))
+)
+
+
+# Ordenamos por BIC porque es el indicador más severo de la solidez
+comparar_modelos <- comparar_modelos[order(comparar_modelos$BIC), ]
+
+pander(comparar_modelos, 
+       caption = "Comparación de la solidez: BIC (eficiencia) y Complexidad (pureza)")
+
+```
+
+
+El mejor modelo para el análisis factorial es el de **Máxima Verosimilitud**, 
+
+Utilizamos el método de los **Mínimos Cuadrados** como mejor estimación. 
+
+Aunque con una complejidad ligeramente mayor, tiene mejores RMSE y BIC (No considerando MLE).
+
+Sin embargo, hay que precisar que la diferencia es mínima, cualquier modelo utilizado nos da una buena estimación de los datos.
+
+
+```{r}
+#  Estraiamo i loadings (saturazioni) 
+
+cargas_matrice <- as.matrix(mod_minchi$loadings[, 1:2])
+
+colnames(cargas_matrice) <- c("PC1", "PC2")
+
+# Visualizzazione del risultato arrotondato
+round(cargas_matrice, 3)
+
+```
+
+El análisis muestra que tenemos una sólida base común representada por un factor general (PC1), para luego tener un factor que captura las especificidades de 2 subgrupos distintos  (PC2).
+
+
+```{r}
+fa.diagram(cargas_matrice)
+```
+
+
+El hecho de que todas las variables estén fuertemente saturadas en el primer factor (F1) demuestra la existencia de una dimensión general del trastorno por TDAH que incide fuertemente con respecto al segundo factor (F2) que dice en qué dirección se inclina el trastorno.
+
+
+
+## 3.3.4 Comunalidad
+
+Para obtener una mejor representación, en lugar de ponderaciones analizaremos la varianza explicada (cuánta información se captura) de cada variable en los dos factores. 
+
+
+Ahora vamos a comparar las diversas comunalidades de los otros métodos, no para verificar más la validez del método elegido, sino para comprobar si hay variables que son muy influenciadas según el modelo elegido.
+
+
+```{r}
+
+# Clasificación y comparación de las comunalidades 
+
+# Extraemos la comunalidad y la clasificamos de mejor a peor
+c_mle   <- sort(mod_mle$communality, decreasing = TRUE)
+c_minres <- sort(mod_minres$communality, decreasing = TRUE)
+c_pa   <- sort(mod_pa$communality, decreasing = TRUE)
+c_minchi <- sort(mod_minchi$communality, decreasing = TRUE)
+
+
+# Centrarse en las mejores comunidades
+tabella_comunalita <- cbind(MLE = c_mle, MinRes = c_minres, PA = c_pa, MinChi = c_minchi)
+pander(round(tabella_comunalita, 3), 
+       caption = "Top Comunalities (h2) sorted by method")
+```
+
+
+No tenemos ninguna variable con una fuerte 'oscilación' dependiendo del modelo elegido.
+
+
+Ahora vamos a analizar en detalle cómo está distribuida la información en los dos componentes de nuestro modelo elegido. 
+
+
+
+```{r}
+
+#  Extraemos las cargas (loadings) del modelo MLE 
+cargas_minchi <- mod_minchi$loadings[, 1:2]
+
+#  Elevamos al cuadrado para obtener la varianza explicada por cada componente
+varianza_repartida <- cargas_minchi^2
+
+#  Añadimos la Comunalidad Total (h2) para poder ordenar la tabla
+h2_total <- rowSums(varianza_repartida)
+tabla_reparticion <- cbind(varianza_repartida, h2_total)
+
+#  Renombramos las columnas para mayor claridad
+colnames(tabla_reparticion) <- c("PC1", "PC2", "Comunalidad Tot")
+
+# Ordenamos la tabla según la Comunalidad Total (del síntoma más sólido al menos)
+tabla_final <- tabla_reparticion[order(tabla_reparticion[, 3], decreasing = TRUE), ]
+
+#  Visualización elegante con pander
+pander(round(tabla_final, 3), 
+       caption = "Repartición de la Comunalidad entre PC1 y PC2")
+```
+
+Se puede notar perfectamente lo que hemos dicho antes.
+
+
+Ahora hacemos una visualización gráfica.
+
+
+```{r}
+
+# Grafico delle saturazioni 
+plot(mod_minchi, labels = colnames(datos), cex = 0.7, 
+     main = "Mapa de los factores: Mínimos Cuadrados")
+```
+
+Se puede notar que la variable turns no es una variable que pertenece distintivamente a un grupo específico como por ejemplo go.
+
+
+Utilizamos la PA para visualizar cómo se ubican las personas en el gráfico factorial.
+
+```{r}
+
+facCP <- prcomp(datos, scale. = TRUE)
+
+# Variables coloreadas por su calidad de representación (cos2)
+fviz_pca_var(facCP, col.var = "red",
+             repel = TRUE
+)
+
+# Gráfico Biplot (individuos + variables)
+fviz_pca_biplot(facCP, 
+                # Rimuove le etichette degli individui (usa solo i punti)
+                geom.ind = "point", 
+                
+                #  Colori ad alta evidenza
+                col.var = "red",          # Variabili in rosso acceso
+                col.ind = "steelblue",        # Individui in nero
+                alpha.ind = 0.3,          # Trasparenza per gestire la sovrapposizione
+                
+                #  Estetica delle frecce
+                arrowsize = 0.5, 
+                labelsize = 5,            # Dimensione del testo delle variabili
+                
+                #  Titoli e pulizia
+                title = "Mapa PCA: Variables y individuos",
+                repel = TRUE              # Evita sovrapposizione nomi variabili
+)
+  
+```
+
+
+## 3.3.5 Rotacion
+
+
+Usamos la rotación para maximizar las diferencias, mueve los ejes matemáticos para hacer que los resultados sean interpretables.
+
+Útil cuando en nuestro caso el primer factor se toma "un poco de todo", creando confusión.
+
+
+```{r}
+#Aqui podemos ver como sabemos de antes que todas las variables estan cargados negativamente y hay diferencias muy pequeñas entre ellas, además de como hay dos grupos diferenciados segun el segundo factor.
+
+# --- Comparación estadística de la rotación ---
+
+rotazioni <- c("none", "varimax", "quartimax", "promax", "oblimin")
+
+confronta_rot <- function(tipo) {
+  mod <- fa(datos, nfactors = 2, fm = "minchi", rotate = tipo)
+  
+  data.frame(
+    Rotazione = tipo,
+    BIC = mod$BIC,
+    RMSEA = as.numeric(mod$RMSEA[1]),
+    Complexity_Media = mean(mod$complexity),
+    Varianza_Totale = sum(mod$Vaccounted["Proportion Var",])
+  )
+}
+
+risultati_statistici <- do.call(rbind, lapply(rotazioni, confronta_rot))
+
+# Arrotondiamo solo le colonne numeriche (dalla 2 alla 5)
+risultati_statistici[, 2:5] <- round(risultati_statistici[, 2:5], 4)
+
+# Ordiniamo per Complexity_Media (la più bassa è la migliore)
+risultati_statistici <- risultati_statistici[order(risultati_statistici$Complexity_Media), ]
+
+
+pander(risultati_statistici)
+```
+
+
+La comparación estadística entre diferentes procedimientos de rotación indica que la rotación **Promax** minimiza la complejidad de la estructura factorial (Mean Complexity = 1,163 ).
+
+Los otros índices iguales sólo nos dan confirmación de la estabilidad del modelo factorial.
+
+
+
+```{r}
+ # Applichiamo la rotazione Promax
+
+rot_res <- promax(cargas_matrice, m = 4)
+
+rotacionCP <- rot_res$loadings
+
+colnames(rotacionCP) <- c("PC1", "PC2")
+
+print(rotacionCP, cutoff = 0.3, sort = TRUE)
+
+fa.diagram(rotacionCP, main = "Diagrama factorial (Rotación Promax)")
+```
+
+
+El análisis revela una estructura bipolar , el modelo dividió los 10 síntomas en dos "súper-categorías".
+
+El PC1 agrupa los síntomas relacionados con la falta de atención y la gestión del esfuerzo.
+
+el PC2 aísla las manifestaciones de hiperactividad motora. 
+
+La varianza explicada del 55,8% confirma la alta capacidad del modelo para representar las construcciones latentes de la perturbación.
+
+
+
+## 3.3.6 Verifica della Alpha di Cronbach
+
+```{r}
+# Gruppo 1: Disattenzione (PC1)
+datos_1 <- datos[, c("instruct", "effort", "organize", "forget", "attention")]
+
+# Gruppo 2: Iperattività (PC2)
+datos_2 <- datos[, c("go", "talks", "fidgets", "turns", "runs")]
+
+# Calcolo dell'Alfa per il primo gruppo
+alpha_1 <- alpha(datos_1, check.keys = TRUE)
+
+# Calcolo dell'Alfa per il secondo gruppo
+alpha_2 <- alpha(datos_2, check.keys = TRUE)
+
+cat("Alpha di Cronbach - Hiperactividad:", alpha_2$total$raw_alpha, "\n")
+cat("Alpha di Cronbach - Inatención:", alpha_1$total$raw_alpha, "\n")
+```
+
+El Alfa nos dice cuánto los ítems de un grupo están relacionados entre sí, en nuestro caso tenemos la confirmación definía que las variables de un grupo están midiendo el mismo concepto y han sido puestas juntas por puro azar.
+
+
+
+```{r}
+# Agrupamos las variables de forma dinámica (5 de Inatención, 5 de Hiperactividad)
+grupos_tdah <- rep(c("Inatención", "Hiperactividad"), each = 5)
+
+# 2. Generamos el Biplot optimizado
+fviz_pca_biplot(facCP, 
+                # --- Configuración de Pacientes ---
+                geom.ind = "point",      
+                col.ind = "steelblue", 
+                alpha.ind = 0.4, 
+                
+                # --- Configuración de Síntomas ---
+                col.var = grupos_tdah, 
+                palette = c("orange", "red"), 
+                legend.title = "Dimensiones TDAH",
+                
+                # --- Estética y Etiquetas ---
+                arrowsize = 0.6,
+                repel = TRUE, 
+                title = "Mapa Clínico: Pacientes y Síntomas"
+) +
+  
+  theme_minimal()
+```
+
+**Conclusión**
+
+El análisis factorial nos permite decir con cierta seguridad estadística que las 10 variables se pueden distinguir en 2 grupos.
+
+Los cinco primeros elementos se refieren a la dimensión de los problemas de atención, mientras que los cinco últimos elementos se refieren a la dimensión de hiperactividad/impulsividad.
+
+
+
