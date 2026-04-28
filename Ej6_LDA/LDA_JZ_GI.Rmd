@@ -1,0 +1,212 @@
+---
+title: "Ejercicios de LDA"
+author: "Jan Żurek y Guido D'Inverno"
+date: "04/2026"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+    toc: true
+    highlight: tango
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# Configuración global de los bloques de código
+knitr::opts_chunk$set(
+  include = TRUE,   # Muestra los gráficos y las tablas 
+  echo = TRUE,      # Muestra el código en el PDF
+  warning = FALSE,  # Oculta los mensajes de advertencia
+  message = FALSE   # Oculta los mensajes de carga
+)
+
+# =======================================================
+# 1. IMPORTACIÓN Y MANIPULACIÓN DE DATOS
+# =======================================================
+library(readxl)               # Lee e importa datos de archivos Excel (.xls y .xlsx)
+library(dplyr)                # Manipulación rápida de datasets (filtros, selecciones, agrupaciones)
+library(tidyr)                # Limpieza y reordenamiento de datos (funciones como pivot_longer/wider para datos "tidy")
+
+# =======================================================
+# 2. ESTADÍSTICAS DESCRIPTIVAS Y EXPLORATORIAS
+# =======================================================
+library(pastecs)              # Análisis espacial/temporal y estadísticas descriptivas básicas (ej. función stat.desc)
+library(modeest)              # Cálculo y estimación de la moda para datos univariados
+library(PerformanceAnalytics) # Herramientas avanzadas para el análisis de rendimiento/riesgo y matrices de correlación visuales
+
+# =======================================================
+# 3. VISUALIZACIÓN GRÁFICA
+# =======================================================
+library(graphics)             # Paquete base de R para gráficos estándar (plot, hist, barplot)
+library(ggplot2)              # Creación de gráficos avanzados y personalizables basados en la "Grammar of Graphics"
+library(GGally)               # Extensión de ggplot2 para combinar varios gráficos (ej. ggpairs para matrices de dispersión)
+library(patchwork)            # Permite combinar y organizar fácilmente varios gráficos ggplot2 en una sola imagen
+
+# =======================================================
+# 4. CORRELACIÓN Y ANÁLISIS DE REDES (NETWORK ANALYSIS)
+# =======================================================
+library(corrplot)             # Visualización gráfica y elegante de matrices de correlación
+library(polycor)              # Cálculo de matrices de correlaciones policóricas, tetracóricas y biseriales
+library(qgraph)               # Visualización de redes y modelos psicométricos (Network Analysis)
+library(igraph)               # Creación, manipulación y análisis de grafos y redes complejas
+
+# =======================================================
+# 5. PRUEBAS ESTADÍSTICAS, SUPUESTOS Y NORMALIDAD
+# =======================================================
+library(car)                  # "Companion to Applied Regression": pruebas de supuestos, ANOVA y transformación de datos
+library(nortest)              # Pruebas de normalidad univariadas para muestras complejas (ej. Anderson-Darling)
+library(mvtnorm)              # Cálculo de probabilidades y cuantiles para la distribución normal multivariante
+library(MVN)                  # Pruebas de normalidad multivariante y detección de valores atípicos (outliers) multivariantes
+library(mvnormtest)           # Extensión de la prueba de Shapiro-Wilk para la normalidad multivariante
+
+# =======================================================
+# 6. ANÁLISIS MULTIVARIANTE: PCA Y ANÁLISIS FACTORIAL
+# =======================================================
+library(psych)                # Funciones para psicometría: estadísticas, análisis factorial exploratorio (EFA) y PCA
+library(FactoMineR)           # Análisis multivariante exploratorio clásico (PCA, MCA, MFA)
+library(factoextra)           # Extracción y visualización elegante de los resultados de los modelos de FactoMineR
+library(GPArotation)          # Algoritmos de rotación para el análisis factorial (ej. varimax, oblimin)
+library(nFactors)             # Índices y reglas para determinar el número correcto de factores/componentes a extraer
+library(paran)                # Implementa el Análisis Paralelo de Horn para la elección del número de factores
+library(MVA)                  # Funciones y datasets relacionados con el análisis multivariante aplicado
+library(biotools)             # Herramientas para biometría y análisis estadísticos multivariantes aplicados
+
+# =======================================================
+# 7. CLUSTERING Y CLASIFICACIÓN
+# =======================================================
+library(cluster)              # Métodos y algoritmos básicos para el análisis de clústeres (k-means, jerárquico, PAM)
+library(NbClust)              # Proporciona decenas de índices para determinar el número óptimo de clústeres
+library(clValid)              # Validación estadística y biológica de resultados de clustering para decidir qué algoritmo usar
+library(dendextend)           # Creación, personalización visual y comparación de dendrogramas (árboles jerárquicos)
+
+# =======================================================
+# 8. CREACIÓN DE REPORTES Y FORMATEO DE TABLAS
+# =======================================================
+library(knitr)                # Generación de reportes dinámicos combinando código R y texto (Markdown/LaTeX)
+library(pander)               # Transforma objetos y salidas de R en tablas y textos formateados (Markdown) listos para reportes
+```
+
+# 1. Ejercicio 1
+
+## 1.0. Presentación del problema.
+
+Los datos del fichero `Wisconsin18.RData` proceden de un estudio sobre diagnóstico del cáncer de mama por
+imagen. Mediante una punción con aguja fina se extrae una muestra del tejido sospechoso de la paciente. La
+muestra se tiñe para resaltar los núcleos de las células y se determinan los límites exactos de los núcleos. Las
+vari
+
+El fichero contiene un `data.frame`, llamado `Wisconsin` cuyas variables son:
+
+- Las 10 variables explicativas medidas en pacientes cuyos tumores fueron diagnosticados posteriormente.
+
+- La variable tipo que contiene el tipo de tumor (benigno o maligno).
+
+Se pide realizar un análisis de discriminante y realizar una predicción para dos valores elegidos por el
+investigador.
+
+## 1.1. Carga y presentación de datos
+
+Comenzamos con la carga y exploración inicial de los datos. Verificamos la existencia de valores ausentes (nulos) y el tipo de variable de cada columna. Por último, analizamos las estadísticas descriptivas.
+
+```{r, include = FALSE}
+load("Wisconsin18.RData")
+```
+
+```{r}
+cat("Datos faltantes en cada columna:\n")
+pander(colSums(is.na(Wisconsin)), split.table = Inf)
+
+cat("Tipos de columnas\n")
+str(Wisconsin)
+
+cat("Estadisticas descriptivas")
+pander(summary(Wisconsin), round = 4)
+```
+
+Visualizamos las relaciones entre las variables mediante una matriz de dispersión. Esto nos permite observar las correlaciones y el grado de solapamiento entre los tumores benignos y malignos.
+
+```{r}
+pairs.panels(Wisconsin[1:10],
+             gap = 0,
+             pch = 21,
+             cex = 0.5,
+             bg = c("green", "blue")[Wisconsin$tipo],
+             main = "Matriz de dispersión y correlaciones"
+)
+```
+
+Observamos de manera preliminar que los datos presentan un buen potencial para la realización de un análisis discriminante. No obstante, antes de proceder, es necesario verificar el cumplimiento de ciertos supuestos estadísticos clave...
+
+## 1.2. Normalidad
+
+Uno de los supuestos fundamentales para el Análisis Discriminante Lineal (LDA) es la normalidad de las variables. Por lo tanto, debemos comprobar si nuestros datos siguen una distribución normal. Para ello, utilizaremos la prueba de Shapiro-Wilk.
+
+```{r}
+pander(stat.desc(Wisconsin[, -11], basic=FALSE, norm=TRUE), round = 4)
+```
+
+Dado que los valores p son inferiores a 0.05, se rechaza la hipótesis nula de normalidad. Sin embargo, dado el tamaño de la muestra, el LDA puede seguir siendo una técnica robusta para la clasificación.
+
+## 1.3 Análisis Discriminante
+
+Finalmente, procedemos a realizar el esperado análisis discriminante.
+
+```{r}
+discriminante <- lda(tipo~., data = Wisconsin)
+discriminante
+```
+
+1. En primer lugar, observamos las **probabilidades a priori**, que representan la proporción de tumores benignos y malignos en nuestro conjunto de datos.
+
+2. A continuación, se presentan las medias grupales para cada variable. Podemos observar que en algunas de ellas existen diferencias notables entre grupos (por ejemplo, el `radios`: 12.15 frente a 17.46; o la `concavity`: 0.046 frente a 0.16), mientras que en otras, como la simetría (`symmetry`) o la dimensión `fractal`, las diferencias son mínimas o casi inexistentes.
+
+3. La tercera sección de los resultados muestra los **coeficientes lineales de discriminación**. Es fundamental señalar que **no podemos comparar directamente la magnitud de estos coeficientes** para determinar qué variables son las más influyentes en el modelo, ya que **las variables originales no han sido estandarizadas**. Por lo tanto, para una interpretación correcta, procederemos a calcular los coeficientes estandarizados y a ordenarlos según su importancia.
+
+```{r}
+# 1. Calculamos las puntuaciones (scores) de LD1 para cada observación
+lda_values <- predict(discriminante)$x
+
+# 2. Calculamos la correlación entre las variables originales y LD1
+correlations <- cor(Wisconsin[1:10], lda_values)
+
+# 3. Mostramos los resultados ordenados por importancia (valor absoluto)
+sort(abs(correlations[,1]), decreasing = TRUE)
+```
+
+Tras analizar la matriz de estructura (las correlaciones entre las variables originales y la función discriminante LD1), podemos clasificar las variables en tres grupos según su poder de discriminación:
+
+- **Variables clave o de alta importancia** (correlación > 0.7): `concavepoints`, `perimeter`, `radius`, `area`, `concavity` i `compactness`. Estas características son los principales indicadores para diferenciar los tipos de tumor.
+
+- **Variables de importancia moderada** (correlación entre 0.3 y 0.7): `texture`, `smoothness` i `symmetry`. Tienen una contribución relevante, aunque secundaria.
+
+- **Variables poco significativas** (correlación < 0.3): `fractal`. Esta variable apenas aporta información útil para la separación de los grupos en este modelo.
+
+```{r}
+discriminante$svd
+
+# tutaj jeszcze można dodać model manova
+```
+
+El modelo de análisis discriminante presenta un valor singular (`$svd`) de 34.93. Este valor es considerablemente elevado, lo que indica una excelente capacidad de separación entre las dos clases (tumores benignos y malignos).
+
+Al ser un problema de clasificación con solo dos grupos, existe una única función discriminante (LD1) que captura el 100% de la variabilidad inter-grupos. La magnitud de este valor refleja que las medias de los grupos están muy alejadas entre sí en comparación con su dispersión interna, lo que sugiere que el modelo será altamente preciso en sus predicciones.
+
+## 1.4. Visualizaciones - resultos
+
+```{r}
+plot(discriminante, dimen = 1, type="b")
+```
+
+C.D.N....
+
+[Matriz de confusion]
+
+[predicciones]
+
+# 2. Ejercicio 2
+
+## 2.0 Presentación del problema.
+
+El fichero de datos (`discriminante.txt`) contiene para 37 individuos los datos correspondientes a 13 variables denominadas $X1, X2, . . . , X13$ y una última variable que clasifica a las observaciones en tres grupos.
+
+Realizar un análisis discriminante completo.
