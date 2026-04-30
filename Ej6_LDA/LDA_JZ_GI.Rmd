@@ -21,69 +21,76 @@ knitr::opts_chunk$set(
 )
 
 # =======================================================
-# 1. IMPORTACIÓN Y MANIPULACIÓN DE DATOS
+# 1. IMPORTAZIONE E MANIPOLAZIONE DATI
 # =======================================================
-library(readxl)               # Lee e importa datos de archivos Excel (.xls y .xlsx)
-library(dplyr)                # Manipulación rápida de datasets (filtros, selecciones, agrupaciones)
-library(tidyr)                # Limpieza y reordenamiento de datos (funciones como pivot_longer/wider para datos "tidy")
+library(readxl)               # Legge e importa dati da file Excel (.xls e .xlsx)
+library(tidyverse)            # Collezione di pacchetti (ggplot2, dplyr, tidyr, ecc.) per il data science
+library(dplyr)                 # Manipolazione rapida dei dataset (filtri, selezioni, raggruppamenti)
+library(tidyr)                 # Pulizia e riordino dei dati (funzioni come pivot_longer/wider)
+library(carData)               # Set di dati di supporto per il pacchetto 'car' (es. dataset inclusi)
+library(mclust)               # Contiene il dataset 'banknote' e strumenti per clustering model-based
 
 # =======================================================
-# 2. ESTADÍSTICAS DESCRIPTIVAS Y EXPLORATORIAS
+# 2. STATISTICHE DESCRITTIVE ED ESPLORATIVE
 # =======================================================
-library(pastecs)              # Análisis espacial/temporal y estadísticas descriptivas básicas (ej. función stat.desc)
-library(modeest)              # Cálculo y estimación de la moda para datos univariados
-library(PerformanceAnalytics) # Herramientas avanzadas para el análisis de rendimiento/riesgo y matrices de correlación visuales
+library(pastecs)              # Analisi spaziale/temporale e statistiche descrittive (es. funzione stat.desc)
+library(modeest)              # Calcolo e stima della moda per dati univariati
+library(PerformanceAnalytics) # Strumenti avanzati per analisi di rischio e matrici di correlazione visive
 
 # =======================================================
-# 3. VISUALIZACIÓN GRÁFICA
+# 3. VISUALIZZAZIONE GRAFICA
 # =======================================================
-library(graphics)             # Paquete base de R para gráficos estándar (plot, hist, barplot)
-library(ggplot2)              # Creación de gráficos avanzados y personalizables basados en la "Grammar of Graphics"
-library(GGally)               # Extensión de ggplot2 para combinar varios gráficos (ej. ggpairs para matrices de dispersión)
-library(patchwork)            # Permite combinar y organizar fácilmente varios gráficos ggplot2 en una sola imagen
+library(graphics)             # Pacchetto base di R per grafici standard (plot, hist, barplot)
+library(ggplot2)              # Creazione di grafici avanzati basati sulla "Grammar of Graphics"
+library(GGally)               # Estensione di ggplot2 per combinare più grafici (es. ggpairs)
+library(patchwork)            # Permette di combinare e affiancare facilmente più grafici ggplot2
+library(ggpubr)               # Facilita la creazione di grafici pronti per la pubblicazione (es. ggarrange)
 
 # =======================================================
-# 4. CORRELACIÓN Y ANÁLISIS DE REDES (NETWORK ANALYSIS)
+# 4. CORRELAZIONE E NETWORK ANALYSIS (RETI)
 # =======================================================
-library(corrplot)             # Visualización gráfica y elegante de matrices de correlación
-library(polycor)              # Cálculo de matrices de correlaciones policóricas, tetracóricas y biseriales
-library(qgraph)               # Visualización de redes y modelos psicométricos (Network Analysis)
-library(igraph)               # Creación, manipulación y análisis de grafos y redes complejas
+library(corrplot)             # Visualizzazione grafica delle matrici di correlazione
+library(polycor)              # Calcolo di matrici di correlazioni policoriche, tetracoriche e biseriali
+library(qgraph)               # Visualizzazione di reti e modelli psicometrici
+library(igraph)               # Creazione e analisi di grafi e reti complesse
 
 # =======================================================
-# 5. PRUEBAS ESTADÍSTICAS, SUPUESTOS Y NORMALIDAD
+# 5. TEST STATISTICI, ASSUNTI E NORMALITÀ
 # =======================================================
-library(car)                  # "Companion to Applied Regression": pruebas de supuestos, ANOVA y transformación de datos
-library(nortest)              # Pruebas de normalidad univariadas para muestras complejas (ej. Anderson-Darling)
-library(mvtnorm)              # Cálculo de probabilidades y cuantiles para la distribución normal multivariante
-library(MVN)                  # Pruebas de normalidad multivariante y detección de valores atípicos (outliers) multivariantes
-library(mvnormtest)           # Extensión de la prueba de Shapiro-Wilk para la normalidad multivariante
+library(car)                  # Test di assunti, ANOVA, scatterplotMatrix e trasformazione dati
+library(nortest)              # Test di normalità univariati per campioni complessi
+library(mvtnorm)              # Calcolo di probabilità e quantili per distribuzione normale multivariata
+library(MVN)                  # Test di normalità multivariata (Henze-Zirkler) e outlier
+library(mvnormtest)           # Estensione del test di Shapiro-Wilk per la normalità multivariata
 
 # =======================================================
-# 6. ANÁLISIS MULTIVARIANTE: PCA Y ANÁLISIS FACTORIAL
+# 6. ANALISI MULTIVARIATA, PCA E BIOMETRIA
 # =======================================================
-library(psych)                # Funciones para psicometría: estadísticas, análisis factorial exploratorio (EFA) y PCA
-library(FactoMineR)           # Análisis multivariante exploratorio clásico (PCA, MCA, MFA)
-library(factoextra)           # Extracción y visualización elegante de los resultados de los modelos de FactoMineR
-library(GPArotation)          # Algoritmos de rotación para el análisis factorial (ej. varimax, oblimin)
-library(nFactors)             # Índices y reglas para determinar el número correcto de factores/componentes a extraer
-library(paran)                # Implementa el Análisis Paralelo de Horn para la elección del número de factores
-library(MVA)                  # Funciones y datasets relacionados con el análisis multivariante aplicado
-library(biotools)             # Herramientas para biometría y análisis estadísticos multivariantes aplicados
+library(psych)                # Statistiche, analisi fattoriale (EFA), PCA e funzione pairs.panels
+library(FactoMineR)           # Analisi multivariata esplorativa classica (PCA, MCA, MFA)
+library(factoextra)           # Estrazione e visualizzazione elegante dei risultati di FactoMineR
+library(GPArotation)          # Algoritmi di rotazione per l'analisi fattoriale
+library(nFactors)             # Indici per determinare il numero corretto di fattori/componenti
+library(paran)                # Implementa l'Analisi Parallela di Horn
+library(MVA)                  # Funzioni e dataset legati all'analisi multivariata applicata
+library(biotools)             # Strumenti per biometria e test di omogeneità delle covarianze (Box's M test)
 
 # =======================================================
-# 7. CLUSTERING Y CLASIFICACIÓN
+# 7. CLUSTERING, CLASSIFICAZIONE E MACHINE LEARNING
 # =======================================================
-library(cluster)              # Métodos y algoritmos básicos para el análisis de clústeres (k-means, jerárquico, PAM)
-library(NbClust)              # Proporciona decenas de índices para determinar el número óptimo de clústeres
-library(clValid)              # Validación estadística y biológica de resultados de clustering para decidir qué algoritmo usar
-library(dendextend)           # Creación, personalización visual y comparación de dendrogramas (árboles jerárquicos)
+library(cluster)              # Metodi e algoritmi di base per l'analisi dei cluster (k-means, gerarchico)
+library(NbClust)              # Indici per determinare il numero ottimale di cluster
+library(clValid)              # Validazione statistica e biologica dei risultati di clustering
+library(dendextend)           # Personalizzazione visiva e confronto di dendrogrammi
+library(MASS)                 # Funzioni per Analisi Discriminante Lineare (LDA) e Quadratica (QDA)
+library(klaR)                 # Funzioni di classificazione e visualizzazione delle partizioni (partimat)
+library(caret)                # Framework completo per Machine Learning e matrici di confusione avanzate
 
 # =======================================================
-# 8. CREACIÓN DE REPORTES Y FORMATEO DE TABLAS
+# 8. CREAZIONE REPORT E FORMATTAZIONE TABELLE
 # =======================================================
-library(knitr)                # Generación de reportes dinámicos combinando código R y texto (Markdown/LaTeX)
-library(pander)               # Transforma objetos y salidas de R en tablas y textos formateados (Markdown) listos para reportes
+library(knitr)                # Generazione di report dinamici (Markdown/LaTeX)
+library(pander)               # Trasforma output di R in tabelle Markdown pronte per report            # Transforma objetos y salidas de R en tablas y textos 
 ```
 
 # 1. Ejercicio 1
@@ -109,7 +116,15 @@ investigador.
 Comenzamos con la carga y exploración inicial de los datos. Verificamos la existencia de valores ausentes (nulos) y el tipo de variable de cada columna. Por último, analizamos las estadísticas descriptivas.
 
 ```{r, include = FALSE}
+set.seed(2137)
 load("Wisconsin18.RData")
+```
+
+```{r}
+test_obs <- sample(1:nrow(Wisconsin), 2)
+tmp <- Wisconsin[-test_obs, ]
+test_obs <- Wisconsin[test_obs, ]
+Wisconsin <- tmp
 ```
 
 ```{r}
@@ -149,7 +164,22 @@ Dado que los valores p son inferiores a 0.05, se rechaza la hipótesis nula de n
 
 ## 1.3 Análisis Discriminante
 
-Finalmente, procedemos a realizar el esperado análisis discriminante.
+**MANOVA**
+
+Antes de realizar el Análisis Discriminante, llevamos a cabo un MANOVA para contrastar si existen diferencias significativas entre los vectores de medias de los tumores benignos y malignos.
+La hipótesis nula ($H_0$) es que no hay diferencias en las medias de las variables explicativas entre ambos grupos.
+
+```{r}
+variables_x <- as.matrix(Wisconsin[, 1:10])
+
+test_manova <- manova(variables_x ~ Wisconsin$tipo)
+
+summary(test_manova, test = "Wilks")
+```
+
+Como el p-valor es significativamente inferior a 0.05, rechazamos la hipótesis nula. Esto confirma que los dos tipos de tumores son estadísticamente diferentes en términos de sus características morfológicas, lo que justifica proceder con el análisis discriminante.
+
+Finalmente, procedemos a realizar el esperado **análisis discriminante**.
 
 ```{r}
 discriminante <- lda(tipo~., data = Wisconsin)
@@ -183,30 +213,773 @@ Tras analizar la matriz de estructura (las correlaciones entre las variables ori
 
 ```{r}
 discriminante$svd
-
-# tutaj jeszcze można dodać model manova
 ```
 
 El modelo de análisis discriminante presenta un valor singular (`$svd`) de 34.93. Este valor es considerablemente elevado, lo que indica una excelente capacidad de separación entre las dos clases (tumores benignos y malignos).
 
 Al ser un problema de clasificación con solo dos grupos, existe una única función discriminante (LD1) que captura el 100% de la variabilidad inter-grupos. La magnitud de este valor refleja que las medias de los grupos están muy alejadas entre sí en comparación con su dispersión interna, lo que sugiere que el modelo será altamente preciso en sus predicciones.
 
-## 1.4. Visualizaciones - resultos
+## 1.4. Visualizaciones
 
 ```{r}
 plot(discriminante, dimen = 1, type="b")
 ```
 
-C.D.N....
+Para visualizar la eficacia del modelo, representamos la densidad de las puntuaciones (scores) de la función LD1 para ambos grupos. Como se observa en el gráfico, existe un solapamiento mínimo entre las distribuciones de los tumores benignos y malignos. Esto confirma visualmente la gran capacidad del modelo para clasificar correctamente las observaciones, en línea con el elevado valor singular (`svd`) obtenido anteriormente.
 
-[Matriz de confusion]
+```{r}
+df_plot <- data.frame(LD1 = lda_values, Tipo = Wisconsin$tipo)
 
-[predicciones]
+ggplot(df_plot, aes(x = LD1, fill = Tipo)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Separación de grupos basada en LD1",
+       x = "Puntuación de la Función Discriminante (LD1)",
+       y = "Densidad",
+       fill = "Tipo de tumor") +
+  scale_fill_manual(values = c("green", "blue"))
+```
 
-# 2. Ejercicio 2
+**Fronteras de decisión**
 
-## 2.0 Presentación del problema.
+Para visualizar las fronteras de decisión, hemos generado una matriz de partición utilizando las cuatro variables con mayor poder discriminante.
+
+```{r}
+partimat(tipo ~ concavepoints + perimeter + radius + area, 
+         data = Wisconsin, 
+         method = "lda",
+         col.mat = c("lightgreen", "pink"),
+         image.colors = c("#90EE90", "pink"),
+         main = "Matriz de partición (LDA)")
+```
+
+Este gráfico divide el plano en regiones de clasificación según el modelo LDA. Las áreas de color representan la zona donde el modelo asignaría un nuevo caso a una categoría específica (benigno o maligno). Podemos observar que en pares como `concavepoints` y `perimeter`, la frontera de decisión separa bastante bien ambas clases, lo que demuestra la robustez del modelo en estas dimensiones.
+
+## 1.5. Matriz de confusion
+
+```{r}
+table(predict(discriminante)$class, Wisconsin$tipo)
+
+(1 - sum(predict(discriminante)$class == Wisconsin$tipo) / discriminante$N)*100
+
+tabla<-table(predict(discriminante)$class, Wisconsin$tipo)
+sum(diag(tabla))/sum(tabla)
+```
+
+## 1.6. Análisis cuadrático
+
+```{r}
+boxM(Wisconsin[,-11], Wisconsin$tipo)
+
+cuadratico <- qda(tipo ~ ., data = Wisconsin)
+
+cuadratico
+```
+
+```{r}
+partimat(tipo ~ concavepoints + perimeter + radius + area, 
+         data = Wisconsin, 
+         method = "qda",
+         col.mat = c("lightgreen", "pink"),
+         image.colors = c("#90EE90", "pink"),
+         main = "Matriz de partición (QDA)")
+```
+
+```{r}
+table(predict(cuadratico)$class, Wisconsin$tipo)
+
+(1 - sum(predict(cuadratico)$class == Wisconsin$tipo) / cuadratico$N)*100
+
+tabla<-table(predict(cuadratico)$class, Wisconsin$tipo)
+sum(diag(tabla))/sum(tabla)
+```
+
+## 1.7. Predicciones
+
+```{r}
+cat("Predicciones para `test observaciones`:\n")
+predict(discriminante, test_obs)$class
+
+cat("Test observaciones:\n")
+pander(test_obs)
+```
+
+Vemos que solo se ha logrado clasificar correctamente una de las observaciones de prueba.
+
+# Ejercicio 2 :Análisis discriminante de dataset 'discriminante.txt'
+
 
 El fichero de datos (`discriminante.txt`) contiene para 37 individuos los datos correspondientes a 13 variables denominadas $X1, X2, . . . , X13$ y una última variable que clasifica a las observaciones en tres grupos.
 
 Realizar un análisis discriminante completo.
+
+
+## 2.1. Análisis previos
+
+```{r}
+
+data2<-read.table("discriminante.txt",header=T)
+
+pander(head(data2))
+
+```
+
+El conjunto de datos "discriminante.txt" se ha cargado correctamente.
+
+
+```{r}
+cat("Datos faltantes en cada columna:\n")
+pander(colSums(is.na(data2)), split.table = Inf)
+
+cat("Tipos de columnas\n")
+str(data2)
+
+```
+
+No tenemos valores NA y estructura de datos correcta.
+
+
+```{r}
+cat("Estadisticas descriptivas")
+pander(summary(data2), round = 4)
+```
+
+Variables como X10 (de 0.2 a 18.3) y X3 (de 10.1 a 23.7) muestran una desviación significativa.
+
+X5 y X11 tienen valores muy bajos (medias en torno a 0.15), lo que probablemente indique concentraciones químicas o relaciones específicas.
+
+X12 es la variable con mayor magnitud (rango de 145 a 490); podría ser una de las variables que más influiría en el análisis. 
+
+
+```{r}
+pander(stat.desc(data2[, -14], basic=FALSE, norm=TRUE), round = 3)
+```
+
+X1 y X9 son problemáticas, ya que ambas presentan una **asimetría** muy alta (1.62 y 1.80) y una **curtosis** elevada (3.94 y 3.21).
+
+Tenemos una **varianza** muy pequeña en X5 y X7 (0.007 - 0.002); al compararlas con las demás variables del análisis discriminante, la información que nos proporcionarán será tan escasa que se ignorarán.
+
+Es muy probable que **NO** haya homocedasticidad; en muchas variables del conjunto de datos se observa que, cuando la media es alta, la varianza tiende a dispararse.
+
+En **normtest.p** tenemos la certeza de que $X1, X2, X4, X6, X9, X11, X12$ violan significativamente la distribución normal. 
+
+En concreto, X1 y X9 tienen un valor p igual a 0, lo que indica una fuerte desviación.
+
+
+En este caso sería recomendable utilizar el QDA, pero hagamos una prueba para confirmar si hay normalidad.
+
+
+
+```{r}
+testt<-mvn(data2[,-14],univariate_test = "SW")
+pander(testt$univariate_normality)
+pander(testt$multivariate_normality)
+```
+
+La prueba univariante (**Shapiro-Wilk**) nos confirma que 6 de las 13 variables no siguen una distribución normal ($X1, X2, X4, X6, X9, X11, X12$).
+
+Sin embargo, el resultado más importante lo obtenemos con la prueba de **Henze-Zirkler**, que nos confirma que rechazamos la hipótesis de normalidad multivariante.
+
+Esto significa que el rendimiento predictivo y la validez de las pruebas de significación del LDA podrían verse comprometidos.
+
+
+```{r}
+resultado_box2 <- boxM(data2[1:10], data2$discriminante)
+
+pander(resultado_box2)
+```
+
+No hemos podido utilizar todas las variables porque el impacto de muchas de ellas, cuya varianza es cercana a 0, nos da un resultado de «Na».
+
+Sin embargo, podemos observar que, al añadir casi todas ellas, la hipótesis de multicolinealidad queda claramente rechazada, por lo que sería muy recomendable utilizar el análisis de datos cualitativos (QDA).
+
+
+
+Análisis gráfico del comportamiento de las variables numéricas
+
+```{r}
+pairs.panels(data2[1:13],
+             method = "pearson",
+             gap = 0,
+             pch = 21,
+             bg = c("red", "green", "blue")[data2$discriminante],
+             main = "Matriz de dispersión y correlaciones"
+)
+```
+
+En el gráfico podemos ver las agrupaciones que hay en las variables, lo cual resultará muy difícil de interpretar debido a la gran diferencia en la posición de los puntos de cada grupo en los gráficos de las variables.
+
+
+
+Dado que debemos realizar un análisis discriminante completo, decidimos continuar con el LDA y, posteriormente, pasar al QDA.
+
+Esperamos una mejora significativa de la capacidad predictiva.
+
+
+
+
+## 2.2. Análisis Discriminante Linear (LDA)
+
+
+
+```{r}
+variables_x <- as.matrix(data2[, 1:13])
+
+test_manova <- manova(variables_x ~ data2$discriminante)
+
+summary(test_manova, test = "Wilks")
+```
+
+Con la **manova** tenemos la confirmación de que los tres grupos son estadísticamente diferentes entre sí si consideramos todas las variables X en conjunto, por lo que procedemos con el análisis discriminante.
+
+
+```{r}
+discriminante2 <- lda(discriminante~., data = data2 )
+
+discriminante2
+```
+
+- **Probabilidades a priori de los grupos**: La probabilidad de acabar en los grupos está bastante equilibrada,ligeramente superior para el grupo 2 .
+
+- **Medias de los grupos**: 
+
+El grupo 1 destaca por los valores más altos de $X2, X7, X9$, pero tiene el valor más bajo de $X12$ (216.25).
+
+El grupo 2 tiene valores intermedios en casi todo.
+
+El grupo 3 se caracteriza por valores muy altos en $X12$ (333.18) y $X10$ (8.27), mientras que tiene el valor mínimo en $X2$ (2.19)
+
+
+- **Coeficientes LD1 y LD2**: 
+
+
+$$
+LD1=-0.4748*X1-2.3163*X2-0.0566*X3+0.9385*X4+3.862*X5-1.396*X6-0.0869*X7-0.4417*X8-0.0895*X9+0.1596*X10+3.3174*X11-0.0011*X12+0.1527*X13
+$$
+
+LD1 explica el 88.46 % de la capacidad del modelo para distinguir entre grupos; casi la totalidad de las diferencias entre grupos se explica mediante LD1.
+
+
+
+```{r}
+valori2_lda <- predict(discriminante2)$x
+
+# Usiamo [,1] per selezionare solo la prima funzione discriminante
+correlazion_ld1 <- cor(data2 [, 1:13], valori2_lda[, 1])
+
+importanz_variabiliLD1 <- sort(abs(correlazion_ld1[, 1]), decreasing = TRUE)
+
+
+pander("Correlación estructural con LD1:")
+pander(importanz_variabiliLD1)
+
+```
+
+Aquí podemos observar cómo las variables X2 y X12 son los principales factores discriminantes de mi función; X9 (0.397), X1 (0.267) y X10 (0.264) son variables que contribuyen de manera significativa, aunque secundaria.
+
+Mientras que X4 (0.053) y X13 (0.002) tienen una correlación casi nula con LD1. 
+
+
+$$
+LD2=2.7884*X1-0.2894*X2-0.2023*X3-0.8945*X4-2.0567*X5-0.9302*X6+0.854*X7-0.4332*X8+0.2666*X9-0.04945*X10 -0.4625*X11+0.004*X12+0.2936*X13
+$$
+
+LD2 (11.54 %): Es una función secundaria que perfecciona la separación.
+
+
+```{r}
+# Usiamo [,2] per selezionare solo la seconda funzione discriminante
+correlazion_ld2 <- cor(data2 [1:13], valori2_lda[, 2])
+
+importanz_variabiliLD2 <- sort(abs(correlazion_ld2[, 1]), decreasing = TRUE)
+
+
+pander("Correlación estructural con LD2:")
+pander(importanz_variabiliLD2)
+```
+
+
+X13 (0.418) y X1 (0.393) son las variables más significativas de esta función; LD2 recoge información que LD1 no tiene en cuenta.
+
+X12 (0.096) y X6 (0.039) son variables que no aportan nada a LD2.
+
+
+```{r}
+discriminante2$svd
+```
+
+Aquí vemos que la primera función es mucho más discriminante que la segunda, lo que confirma que la separación de los grupos es sólida y depende en gran medida de la combinación de variables que compone LD1.
+
+
+
+```{r}
+# Preparación de los datos: extraemos las coordenadas LD1 y LD2
+
+data2$discriminante <- as.factor(data2$discriminante)
+
+datos_grafico <- data.frame(valori2_lda, Discriminante = data2$discriminante)
+
+ggplot(datos_grafico, aes(x = LD1, y = LD2, color = Discriminante, fill = Discriminante)) +
+  # Añadimos las elipses de confianza (por defecto al 95%) para ver la dispersión
+  stat_ellipse(geom = "polygon", alpha = 0.2) + 
+  # Añadimos los puntos de los datos
+  geom_point(size = 3, alpha = 0.8) +
+  # Aplicamos un tema visual limpio
+  theme_minimal() +
+  # Etiquetas de títulos y ejes
+  labs(title = "Espacio Discriminante LDA",
+       subtitle = "Separación de los grupos basada en LD1 y LD2",
+       x = "LD1 ",
+       y = "LD2 ") +
+  # Escalas de colores profesionales (discretas)
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1")
+
+```
+
+
+Gráficamente podemos ver cómo se separan los grupos en función de sus características; se observa que hay una distinción entre ellos, aunque en algunos casos se solapan ligeramente.
+
+
+```{r}
+pairs(discriminante2)
+```
+
+Podemos observar que ambas funciones clasifican bastante bien a los grupos.
+
+
+```{r}
+print(confusionMatrix(predict(discriminante2)$class,data2$discriminante))
+
+```
+
+La clasificación LDA es muy precisa (0.89); a pesar de los problemas de normalidad y homocedasticidad detectados al principio, la separación entre los grupos es tan clara que el modelo consigue distinguir las clases con un margen de error mínimo.
+
+
+Sin embargo, la clase 2 es la única que ha presentado problemas de clasificación,De los 14 individuos reales del Grupo 2, solo logró 10.
+
+
+
+Predicción con 2 nuevos valores dado.
+
+
+```{r}
+
+# Definimos las 3 nuevas personas con 13 valores cada una
+# Persona 1: Perfil similar al Grupo 1 (Valores altos en X2)
+# Persona 2: Perfil similar al Grupo 2 (Valores intermedios)
+# Persona 3: Perfil similar al Grupo 3 (Valores altos en X10 y X12)
+
+nuevass.obs <- data.frame(rbind(
+  c(5.6, 4.2, 15.9, 1.7, 0.17, 1.6, 2.3, 6.0, 4.0, 5.2, 0.14, 216, 26), # Persona A
+  c(5.4, 3.1, 17.8, 1.5, 0.14, 1.6, 1.9, 5.2, 2.6, 7.4, 0.15, 285, 23), # Persona B
+  c(5.5, 2.2, 16.3, 1.8, 0.14, 1.7, 2.2, 5.3, 2.5, 8.2, 0.15, 333, 26)  # Persona C
+))
+
+# Asignamos los nombres de las columnas del dataset original (X1 a X13)
+names(nuevass.obs) <- names(data2)[1:13]
+
+#  Realizamos la predicción
+prediccions <- predict(discriminante2, nuevass.obs)
+ 
+ print(prediccions)
+```
+
+El modelo clasificó correctamente nuestras nuevas observaciones.
+
+Esto significa que si un individuo tiene características que se acercan a un grupo, el modelo no fallará en colocarlo.
+
+
+
+
+
+
+## 2.3. Analysis Cuadratico (QDA)
+
+
+Debido al bajo número de observaciones y el alto número de variables, el riesgo es no poder realizar una QDA.
+
+Luego eliminaremos las 4 variables menos significativas en el análisis anterior para reducir la cantidad de combinaciones que la QDA debe calcular.
+
+```{r}
+# Realizamos la QDA eliminando las 4 menos significativas
+# (Ajusta los nombres X5,X6, X8, X11 si tus resultados mostraron otras diferentes)
+
+modelo_qda_9 <- qda(discriminante ~ X1 + X2 + X3 + X4 + X7 + X10 + X9 + X12 + X13, 
+                     data = data2 )
+
+# Ver el resumen del modelo
+print(modelo_qda_9)
+
+```
+Los mismos valores que aparecieron en la LDA.
+
+
+```{r}
+print(confusionMatrix(predict(modelo_qda_9)$class,data2$discriminante))
+```
+
+Podemos notar la mejora neta con LDA, la exactitud es perfecta, hay una probabilidad de 0 de que se cometa un error en la colocación.
+
+
+# Ejercicio 3: Análisis discriminante de dataset 'discriminante2.txt'
+
+
+Se desea estudiar la ansiedad de un grupo de exfumadores. 
+
+Para ello se clasifica la ansiedad en tres grupos (1, 2 y 3) según la intensidad con que se manifiesten los síntomas de esta. Se obtiene una muestra para cada grupo y se les miden a todos los individuos 3 variables $X1, X2 , X3$ relacionadas con sus esquemas de comportamiento. 
+Se desea obtener una función discriminante lineal para poder clasificar en un grupo u otro a un individuo, en base a las variables $X1, X2 , X3$. 
+Los datos se encuentran en el fichero ($'discriminante2.txt'$).
+
+Realizar un análisis discriminante completo y predecir a qué grupo de ansiedad pertenecerá con mayor
+probabilidad un individuo con valores $X1=7.5, X2=9 , X3=2$ .
+
+
+## 3.1. Análisis previos
+
+```{r}
+datos<-read.table("discriminante2.txt",header=T)
+
+pander(head(datos))
+```
+
+El conjunto de datos "discriminante2.txt" se ha cargado correctamente.
+
+
+```{r}
+# Verificación de valores faltantes
+pander(colSums(is.na(datos)))
+```
+
+No tenemos valores NA.
+
+
+```{r}
+str(datos)
+```
+
+Estructura de datos correcta.
+
+
+```{r}
+pander(summary(datos))
+```
+
+El hecho de que las medias y los rangos de X1, X2 y X3 sean diferentes confirma que estas variables operan en escalas distintas.
+
+Mediante el análisis discriminante, intentaremos determinar cuál de estas medias 'desplaza' en mayor medida a un individuo de un grupo de 'ansiedad' a otro.
+
+
+
+
+Al analizar más detenidamente las estadísticas descriptivas, observaremos que:
+
+```{r}
+pander(round(stat.desc(datos[,-1],basic=FALSE,norm=TRUE),3))
+```
+
+
+En **skew.2SE** podemos observar que X3 presenta una asimetría positiva significativa, mientras que X2 muestra una fuerte asimetría negativa.
+
+
+Las variables X1 y X2 presentan valores de **kurtosis** muy negativos (−1,457 y −1,186), lo que indica que sus valores no se concentran en torno a la media.
+
+
+Vemos en la fila de **normtest.P** que todas las variables rechazan la hipótesis de multicolinealidad; esto influye mucho en nuestro análisis discriminante en LDA. 
+
+Sería más adecuado utilizar un QDA, pero como debemos realizar un análisis completo, compararemos ambos análisis discriminantes.
+
+
+
+
+```{r}
+test<-mvn(datos[,-1],univariate_test = "SW")
+pander(test$univariate_normality)
+pander(test$multivariate_normality)
+```
+
+
+Tenemos la confirmación de que ninguna variable cumple la distribución normal, ni en el análisis univariante ni en el multivariante.
+
+
+El análisis de **varianza** nos sugiere que probablemente no se cumple la hipótesis de homocedasticidad de los grupos.
+
+
+```{r}
+resultado_box <- boxM(datos[,-1], datos$ansiedad)
+
+pander(resultado_box)
+```
+
+
+Este Test nos confirma que los grupos presentan dispersiones y relaciones entre las variables significativamente diferentes entre sí.
+
+
+ 
+
+Análisis gráfico del comportamiento de las variables numéricas
+
+```{r}
+scatterplotMatrix(datos[, c("X1", "X2", "X3")],groups = datos$ansiedad)
+
+pairs.panels(datos[, c("X1", "X2", "X3")], 
+             method = "pearson",  
+             hist.col = "gold",   
+             density = TRUE,      
+             ellipses = TRUE,     
+             gap = 0,             
+             pch = 21,           
+             bg= c("red","green","blue")[datos$ansiedad], 
+             main = "Matriz de correlación y distribución por grupos de ansiedad")
+ 
+```
+
+El análisis gráfico nos confirma que sería preferible utilizar un análisis de datos cualitativos (QDA).
+
+
+Podemos llegar a la conclusión de que se desaconseja encarecidamente el LDA, por falta de criterios de homocedasticidad y normalidad multivariante.
+
+Sin embargo, si queremos realizar un análisis discriminante completo, analizaremos primero un LDA y luego un QDA, lo que debería garantizarnos una clasificación más precisa que la primera, al ofrecer mayor flexibilidad.
+
+
+
+## 3.2. Análisis discriminante lineal (LDA)
+
+
+
+```{r}
+#A pesar de esto vamos a contrastar la diferencia de medias y ver como efectivamente hay diferencias
+ anova<-manova(cbind (datos$X1, datos$X2 ,datos$X3)
+ ~ datos$ansiedad)
+summary(anova)
+```
+
+
+El resultado confirma que las variables X1, X2 y X3 no siguen una distribución aleatoria, sino que varían claramente en función del nivel de ansiedad.
+
+Los perfiles medios de los tres grupos de ansiedad son diferentes, por lo que conviene proceder con el análisis discriminante.
+
+
+
+
+```{r}
+ discriminante <-lda(datos$ansiedad~., data= datos)
+ print(discriminante)
+```
+
+
+- **Probabilidades a priori de los grupos**: El grupo 3 es el más numeroso (41.1 %), mientras que los grupos 1 y 2 están representados de forma equitativa (29.4 %).
+
+- **Medias de los grupos**: El grupo 3 destaca claramente, con valores de X1 muy altos (9.10) y valores de X2 muy bajos (5.09) en comparación con los demás.
+
+Los grupos 1 y 2 son muy similares entre sí, por lo que nos resultará difícil distinguirlos.
+
+
+- **Coeficientes LD1 y LD2**: 
+
+
+$$
+LD1=2.7622*X1-1.1804*X2-0.0102*X3
+$$
+
+LD1 explica el 99.88 % de la variación entre los grupos; por sí sola, es casi suficiente para clasificar los datos.
+
+
+
+
+```{r}
+valori_lda <- predict(discriminante)$x
+
+# Usiamo [,1] per selezionare solo la prima funzione discriminante
+correlazioni_ld1 <- cor(datos[, 2:4], valori_lda[, 1])
+
+importanza_variabiliLD1 <- sort(abs(correlazioni_ld1[, 1]), decreasing = TRUE)
+
+
+pander("Correlación estructural con LD1:")
+pander(importanza_variabiliLD1)
+
+```
+
+Aquí podemos observar cómo las variables X1 y X2 se ven influidas por la primera función discriminante.
+
+
+$$
+LD2=-0.8956*X1-0.3304*X2-0.4717*X3
+$$
+
+LD2 solo aporta un 0.12 %, lo que resulta casi insignificante.
+
+
+
+```{r}
+# Usiamo [,2] per selezionare solo la seconda funzione discriminante
+correlazioni_ld2 <- cor(datos[, 2:4], valori_lda[, 2])
+
+importanza_variabiliLD2 <- sort(abs(correlazioni_ld2[, 1]), decreasing = TRUE)
+
+
+pander("Correlación estructural con LD2:")
+pander(importanza_variabiliLD2)
+```
+
+Aquí, en cambio, podemos observar que X3 es la variable más importante que explica la segunda función discriminante, aunque su significación es muy escasa.
+
+
+```{r}
+discriminante$svd
+```
+
+Aquí vemos que la primera función es mucho más discriminante que la segunda, lo que confirma que la separación entre los niveles de ansiedad es extremadamente marcada y depende casi exclusivamente de la combinación de variables que componen LD1.
+
+
+
+```{r}
+# Preparación de los datos: extraemos las coordenadas LD1 y LD2
+
+dati_grafico <- data.frame(valori_lda, Ansiedad = as.factor(datos$ansiedad))
+
+ggplot(dati_grafico, aes(x = LD1, y = LD2, color = Ansiedad, fill = Ansiedad)) +
+  # Añadimos las elipses de confianza (por defecto al 95%) para ver la dispersión
+  stat_ellipse(geom = "polygon", alpha = 0.2) + 
+  # Añadimos los puntos de los datos
+  geom_point(size = 3, alpha = 0.8) +
+  # Aplicamos un tema visual limpio
+  theme_minimal() +
+  # Etiquetas de títulos y ejes
+  labs(title = "Espacio Discriminante LDA",
+       subtitle = "Separación de los grupos de ansiedad basada en LD1 y LD2",
+       x = "LD1 (99.88% de la varianza)",
+       y = "LD2 (0.12% de la varianza)") +
+  # Escalas de colores profesionales (discretas)
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1")
+
+```
+
+Gráficamente, podemos observar que no todos los grupos se distinguen claramente; mientras que el grupo 3 se distingue nítidamente, los otros dos grupos no presentan una distinción tan marcada, lo que podría dar lugar a complicaciones a la hora de clasificar observaciones posteriores.
+
+
+
+```{r}
+pairs(discriminante)
+```
+
+Se puede observar que LD1 clasifica mejor los grupos, mientras que LD2 superpone los valores. 
+
+
+```{r}
+
+# Assicuriamoci che la variabile sia un fattore
+datos$ansiedad <- as.factor(datos$ansiedad)
+
+
+# Creazione del grafico partimat con i colori richiesti
+partimat(ansiedad ~ X1 + X2 + X3, 
+         data = datos, 
+         method = "lda",
+         # Colori delle aree di sfondo (usiamo versioni trasparenti o chiare per leggibilità)
+         image.colors = c("lightcoral", "skyblue","greenyellow"), 
+         # Colore dei punti
+         prec = 200,
+         col.correct = "black", 
+         pch = 21, 
+         main = "Matriz de clasificación (LDA)")
+
+```
+
+
+La combinación de X1 y X2 resulta ser la más eficaz para clasificar correctamente los niveles de ansiedad, con un error de tan solo el 11.8 %.
+
+Esto se debe a que LD1 se ve influida especialmente por las variables X1 y X2;
+
+además, ya hemos visto cómo la primera función explica casi la totalidad de la variabilidad explicada entre los grupos.
+
+
+Una vez creado el modelo, es necesario determinar su grado de precisión.
+
+
+```{r}
+print(confusionMatrix(predict(discriminante)$class,datos$ansiedad))
+```
+
+
+El modelo tiene una precisión del 88 %; es impecable a la hora de reconocer los casos de ansiedad de la Clase 3, mientras que muestra una superposición leve y fisiológica entre la ansiedad leve y la moderada.
+
+El coeficiente kappa (08.211) nos indica que nuestro modelo es sólido y no se debe al azar; el valor p [Acc > NIR] (1.675e-08) nos confirma que la probabilidad de que tu modelo esté acertando por casualidad es prácticamente nula.
+
+
+
+
+Predicción nuevo valor dado.
+
+
+```{r}
+
+nuevas.obs <- data.frame(rbind(c(7.5, 9, 2)))
+
+names(nuevas.obs) <- names(datos[2:4])
+
+prediccion <- predict(discriminante, nuevas.obs)
+ 
+ print(prediccion)
+ 
+```
+
+El modelo establece que un nuevo individuo con estas características tendría un 99.4 % de probabilidades de pertenecer al Grupo 2, un 0.06 % de pertenecer al Grupo 1 y prácticamente un 0 % de pertenecer al Grupo 3.
+
+
+
+## 3.3. Análisis discreminante cuadrático (QDA)
+
+
+```{r}
+cuadratico<-qda(datos$ansiedad ~ datos$X1 + datos$X2 + datos$X3,datos)
+
+print(cuadratico)
+```
+
+Tanto el LDA como el QDA muestran las mismas **probabilidades a priori** y **medias de grupo**; la diferencia radica en la forma en que el modelo 'traza' los límites entre los grupos.
+
+
+```{r}
+#Aqui vemos que la probabilidad son iguales al analisis lineal
+# Creazione del grafico partimat con i colori richiesti
+partimat(ansiedad ~ X1 + X2 + X3, 
+         data = datos, 
+         method = "qda",
+         # Colori delle aree di sfondo (usiamo versioni trasparenti o chiare per leggibilità)
+         image.colors = c("lightcoral", "skyblue","greenyellow"), 
+         # Colore dei punti
+         prec = 200,
+         col.correct = "black", 
+         pch = 21, 
+         main = "Matriz de clasificación (QDA)")
+```
+
+
+Podemos observar gráficamente que, al modificar los límites y hacerlos más flexibles, la tasa de error ha disminuido en todas las combinaciones de variables, lo que demuestra que, en este caso, el QDA es la opción de análisis discriminante más adecuada.
+
+
+La combinación más significativa sigue siendo la de X1 y X2 (8.8%).
+
+
+
+```{r}
+print(confusionMatrix(predict(cuadratico)$class,datos$ansiedad))
+```
+
+Aquí tenemos una confirmación más de que el QDA ofrece mejores resultados con nuestros datos. 
+
+Hemos pasado de una precisión del 88.24 % (LDA) al 91.18 % (QDA).
+
+
+
+
+
+
+
+
+
+
+
