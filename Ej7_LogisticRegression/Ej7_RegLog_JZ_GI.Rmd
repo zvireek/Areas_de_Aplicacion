@@ -1,0 +1,777 @@
+---
+title: "Ejercicios de Regresión logística"
+author: "Jan Żurek y Guido D'Inverno"
+date: "05/2026"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+    toc: true
+    highlight: tango
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# Configuración global de los bloques de código
+knitr::opts_chunk$set(
+  include = TRUE,    # Muestra los gráficos y las tablas 
+  echo = TRUE,       # Muestra el código en el PDF
+  warning = FALSE,   # Oculta los mensajes de advertencia
+  message = FALSE    # Oculta los mensajes de carga
+)
+
+# =======================================================
+# 1. IMPORTAZIONE E MANIPOLAZIONE DATI
+# =======================================================
+library(readxl)               # Legge e importa dati da file Excel (.xls e .xlsx)
+library(tidyverse)            # Collezione di pacchetti (ggplot2, dplyr, tidyr, ecc.)
+library(dplyr)                # Manipolazione rapida dei dataset
+library(tidyr)                # Pulizia e riordino dei dati
+library(carData)              # Set di dati di supporto per il pacchetto 'car'
+library(mclust)               # Dataset 'banknote' e strumenti per clustering
+
+# =======================================================
+# 2. STATISTICHE DESCRITTIVE ED ESPLORATIVE
+# =======================================================
+library(pastecs)              # Statistiche descrittive (es. funzione stat.desc)
+library(modeest)              # Calcolo e stima della moda
+library(PerformanceAnalytics) # Analisi di rischio e matrici di correlazione visive
+library(summarytools)         # Tabelle riassuntive e frequenze (es. ctable)
+
+# =======================================================
+# 3. VISUALIZZAZIONE GRAFICA
+# =======================================================
+library(graphics)             # Pacchetto base di R per grafici standard
+library(ggplot2)              # Grafici avanzati (Grammar of Graphics)
+library(GGally)               # Estensione di ggplot2 (es. ggpairs)
+library(patchwork)            # Combinazione di più grafici ggplot2
+library(ggpubr)               # Grafici pronti per la pubblicazione
+library(vcd)                  # Visualizzazione di dati categorici (es. mosaic plot)
+
+# =======================================================
+# 4. CORRELAZIONE E NETWORK ANALYSIS (RETI)
+# =======================================================
+library(corrplot)             # Visualizzazione matrici di correlazione
+library(polycor)              # Correlazioni policoriche e tetracoriche
+library(qgraph)               # Visualizzazione di reti e modelli psicometrici
+library(igraph)               # Analisi di grafi e reti complesse
+
+# =======================================================
+# 5. TEST STATISTICI, ASSUNTI E NORMALITÀ
+# =======================================================
+library(car)                  # Test di assunti, ANOVA e trasformazione dati
+library(nortest)              # Test di normalità univariati
+library(mvtnorm)              # Distribuzione normale multivariata
+library(MVN)                  # Test di normalità multivariata
+library(mvnormtest)           # Test di Shapiro-Wilk multivariato
+library(lmtest)               # Test per modelli di regressione (es. lrtest)
+library(aod)                  # Test di ipotesi sui coefficienti (es. wald.test)
+
+# =======================================================
+# 6. MODELLISTICA E REGRESSIONE (LOGISTICA/MULTINOMIALE)
+# =======================================================
+library(nnet)                 # Regressione logistica multinomiale (multinom)
+library(pscl)                 # Indici Pseudo-R2 per modelli logistici (pR2)
+library(DescTools)            # Strumenti statistici vari e PseudoR2 completi
+library(vcdExtra)             # Estensioni per dati categorici e test Hosmer-Lemeshow
+library(Epi)                  # Analisi epidemiologica e curve ROC/AUC
+library(jmv)                  # Funzioni di analisi statistica interfaccia Jamovi
+library(broom)
+
+# =======================================================
+# 7. ANALISI MULTIVARIATA, PCA E BIOMETRIA
+# =======================================================
+library(psych)                # Analisi fattoriale (EFA), PCA e pairs.panels
+library(FactoMineR)           # Analisi multivariata esplorativa (PCA, MCA)
+library(factoextra)           # Visualizzazione elegante risultati FactoMineR
+library(GPArotation)          # Algoritmi di rotazione per analisi fattoriale
+library(nFactors)             # Indici per numero di fattori/componenti
+library(paran)                # Analisi Parallela di Horn
+library(MVA)                  # Analisi multivariata applicata
+library(biotools)             # Biometria e Box's M test
+
+# =======================================================
+# 8. CLUSTERING, CLASSIFICAZIONE E MACHINE LEARNING
+# =======================================================
+library(cluster)              # Algoritmi di clustering (k-means, gerarchico)
+library(NbClust)              # Indici per numero ottimale di cluster
+library(clValid)              # Validazione dei risultati di clustering
+library(dendextend)           # Personalizzazione di dendrogrammi
+library(MASS)                 # Analisi Discriminante (LDA/QDA) e funzioni statistiche
+library(klaR)                 # Classificazione e visualizzazione partizioni
+library(caret)                # Framework Machine Learning e matrici di confusione
+
+# =======================================================
+# 9. CREAZIONE REPORT E FORMATTAZIONE TABELLE
+# =======================================================
+library(knitr)                # Generazione report dinamici
+library(pander)               # Trasforma output di R in tabelle Markdown
+library(magrittr)
+```
+
+
+# Ejercicio 1
+
+## 1.0. Análisis previos
+
+En esta sección se realiza la carga de los datos y la preparación de las variables. Es fundamental que las variables cualitativas sean tratadas como factores, y en los casos donde existe una jerarquía lógica, como factores ordenados.
+
+### Carga de datos y conversión inicial a factores
+
+Comenzamos importando el archivo de datos y transformando las columnas categóricas básicas en factores para que el modelo de regresión logística las interprete correctamente.
+
+```{r}
+# Importación del conjunto de datos
+binomial1 <- as.data.frame(read.table("binomial.txt", header = T, sep = "\t"))
+
+# Visualización de los nombres de las columnas
+colnames(binomial1)
+
+# Conversión masiva de variables cualitativas a factores (columnas 2 a 8 y 10)
+binomial1[c(2:8,10)] <- lapply(binomial1[c(2:8,10)], as.factor)
+```
+
+### Configuración de factores ordinales
+
+Para las variables que representan una escala o progresión (como ingresos, educación o satisfacción), definimos factores ordenados (`ordered = TRUE`). Esto permitirá al modelo identificar tendencias (lineales, cuadráticas, etc.) en los resultados.
+
+#### Variable: Ingresos
+
+```{r}
+# Definición de Ingresos como factor ordinal (el orden se toma automáticamente de los niveles existentes)
+binomial1$Ingresos <- factor(binomial1$Ingresos,
+                            ordered = TRUE)
+```
+
+#### Variable: Educación
+
+Establecemos una jerarquía que va desde el nivel de estudios más bajo hasta el más alto.
+
+```{r}
+# Ordenación jerárquica de los niveles educativos
+binomial1$Educacion <- factor(binomial1$Educacion, 
+                             levels = c("Basicos", "Bachillerato", "Diplomado", "Licenciado", "Tercer ciclo"), 
+                             ordered = TRUE)
+```
+
+#### Variable: Antigüedad laboral
+
+Categorizamos los años de trabajo en tres niveles de experiencia.
+
+```{r}
+# Definición de niveles de antigüedad laboral de menor a mayor
+binomial1$Anostrabajando <- factor(binomial1$Anostrabajando,
+                                  levels = c("Menos de 5", "5 a 15", "Mas de 15"),
+                                  ordered = TRUE)
+```
+
+#### Variable: Satisfacción laboral
+
+Se trata como una escala Likert de cinco puntos, fundamental para medir el clima laboral.
+
+```{r}
+# Ordenación de los niveles de satisfacción, desde el más negativo al más positivo
+binomial1$Satisfaclab <- factor(binomial1$Satisfaclab,
+                                  levels = c("Muy insatisfecho", "Algo insatisfecho", "Neutro", "Algo satisfecho", "Muy satisfecho"),
+                                  ordered = TRUE)
+```
+
+### Verificación de la estructura de los datos
+
+Finalmente, revisamos que todas las transformaciones se hayan aplicado correctamente y que las variables tengan el formato esperado antes de ejecutar el modelo.
+
+```{r}
+# Inspección de la estructura final del dataframe
+str(binomial1)
+```
+
+**Comentarios sobre la estructura:**
+
+*   **Variable objetivo:** `Baja` es un factor con 2 niveles ("No", "SI"), lo cual es adecuado para una regresión logística binaria.
+*   **Variables cuantitativas:** `edad` y `Personashogar` se mantienen como enteros (`int`), representando valores numéricos directos.
+*   **Variables ordinales:** `Ingresos`, `Educacion` y `Anostrabajando` aparecen correctamente como `Ord.factor`. Esto permitirá al modelo capturar tendencias jerárquicas.
+*   **Alta cardinalidad:** Se observa que la variable `Direccion` posee **47 niveles**. Como se analizó en el test de Wald, esta variable aporta demasiada complejidad al modelo sin mejorar necesariamente su precisión, por lo que su eliminación está justificada estadísticamente.
+*   **Factores cualitativos:** `EstadoCivil` y `tipovehiculo` están definidos como factores nominales básicos, ideales para representar categorías sin un orden intrínseco.
+
+## 1.1. Regresión Logística Binomial
+
+En esta sección, procedemos a ajustar el modelo de regresión logística para predecir la probabilidad de la variable objetivo `Baja`.
+
+### Ajuste del modelo completo
+
+Primero, estimamos un modelo inicial que incluye todas las variables predictoras presentes en el conjunto de datos. Utilizamos la función `glm` con la familia `binomial` para indicar que estamos ante un problema de clasificación binaria.
+
+```{r}
+# Ajuste del modelo de regresión logística utilizando todas las variables disponibles
+logistica <- glm(Baja ~ ., data = binomial1, family = binomial)
+```
+
+### Extracción de coeficientes y cálculo de Odds Ratios
+
+Dado que los coeficientes del modelo (`Estimate`) se expresan en escala logarítmica (*log-odds*), su interpretación directa no es intuitiva. Para facilitar la comprensión del impacto de cada variable, calculamos los **Odds Ratios** aplicando la función exponencial a los coeficientes.
+
+```{r}
+# Extracción de la tabla de coeficientes, errores estándar, estadístico z y p-valores
+tab_wyniki <- summary(logistica)$coefficients
+
+# Cálculo de los Odds Ratios (exponencial de los coeficientes) redondeados a 3 decimales
+OR <- round(exp(coef(logistica)), 3)
+```
+
+### Consolidación de resultados
+
+Finalmente, combinamos los resultados estadísticos del modelo con los *Odds Ratios* en una única tabla para su análisis. Un *Odds Ratio* superior a 1 indica un aumento en la probabilidad de "Baja", mientras que un valor inferior a 1 indica una disminución.
+
+```{r}
+# Combinación de la tabla de coeficientes con la columna de Odds Ratios
+tabela_finalna <- cbind(tab_wyniki, Odds_Ratio = OR)
+
+# Presentación estética de los resultados finales con la función kable
+library(knitr)
+kable(round(tabela_finalna, 5), caption = "Resumen del Modelo Logístico con Odds Ratios")
+```
+
+
+
+
+## 1.2. Comprobación de la significatividad del modelo y de las variables
+
+En esta etapa, evaluamos si todas las variables incluidas aportan valor predictivo al modelo o si, por el contrario, algunas generan ruido innecesario.
+
+### 1.2.1. Test de Wald para la variable 'Direccion'
+La variable `Direccion` presenta una alta cardinalidad (46 niveles en el modelo). Utilizamos el test de Wald para evaluar la significatividad conjunta de todos estos parámetros. Una hipótesis nula con un p-valor elevado indicaría que la variable no contribuye significativamente al modelo.
+
+```{r}
+# Realización del test de Wald para los términos del 4 al 49 (niveles de Direccion)
+library(aod)
+wald.test(b = coef(logistica), Sigma = vcov(logistica), Terms = 4:49)
+```
+
+*Nota: Si el p-valor es alto (ej. 0.99), se confirma que la variable 'Direccion' puede ser eliminada sin perder capacidad explicativa.*
+
+### 1.2.2. Refinamiento del modelo (logistica2)
+Tras observar la baja significatividad de la ubicación geográfica, ajustamos un segundo modelo excluyendo la variable `Direccion`. El objetivo es obtener un modelo más parsimonioso y evitar el sobreajuste (overfitting).
+
+```{r}
+# Modelo excluyendo la variable Direccion
+logistica2 <- glm(Baja ~ . - Direccion, data = binomial1, family = binomial)
+
+# Resumen estadístico del segundo modelo
+summary(logistica2)
+```
+
+### 1.2.3. Selección de variables clave (logistica3)
+Basándonos en los resultados anteriores y en la significatividad individual de los coeficientes, proponemos un tercer modelo que solo incluye las variables que han mostrado ser relevantes o que están cerca del umbral de significatividad: `EstadoCivil`, `Ingresos`, `tipovehiculo` y `Personashogar`.
+
+```{r}
+# Ajuste del modelo parsimonioso con las variables más influyentes
+logistica3 <- glm(Baja ~ EstadoCivil + Ingresos + tipovehiculo + Personashogar, 
+                  data = binomial1, 
+                  family = binomial)
+
+# Resumen del modelo simplificado
+summary(logistica3)
+```
+
+### 1.2.4. Comparación de modelos y análisis de devianza
+Para validar nuestras decisiones, analizamos la tabla de devianza. Esta nos permite observar cómo cada variable reduce el error del modelo. Además, comparamos los modelos mediante el **AIC (Akaike Information Criterion)**.
+
+```{r}
+# Análisis de la reducción de la devianza para el modelo 2
+anova(logistica2, test = "Chisq")
+```
+
+### Conclusión de la comparación
+Al comparar los modelos, observamos los valores del **AIC**. Un valor de **AIC más bajo** indica un mejor equilibrio entre el ajuste del modelo y su complejidad (parsimonia). 
+
+*   Si el modelo simplificado mantiene o mejora el AIC del modelo completo, se prefiere el modelo más sencillo por ser más eficiente y fácil de interpretar.
+
+
+
+## 1.3. Evaluación de la Calidad y Bondad de Ajuste
+
+En la regresión logística no existe un $R^2$ convencional. Por ello, utilizamos medidas como el **Pseudo-R2 de McFadden** para entender qué proporción de la varianza es explicada por el modelo final (`logistica3`).
+
+```{r}
+### Bondad de ajuste (McFadden)
+# Un valor entre 0.2 y 0.4 se considera un ajuste excelente.
+library(pscl)
+pseudo_r2 <- pR2(logistica3)["McFadden"]
+print(paste("Pseudo-R2 de McFadden:", round(pseudo_r2, 4)))
+```
+
+## 1.4. Diagnóstico de Multicolinealidad
+
+Es fundamental verificar que las variables predictoras no estén altamente correlacionadas entre sí, ya que esto podría inflar los errores estándar y sesgar los resultados. Utilizamos el **Factor de Inflación de la Varianza (VIF)**.
+
+```{r}
+### Evaluación de multicolinealidad
+# Valores de VIF mayores a 5 o 10 indicarían problemas graves.
+library(car)
+vif(logistica3)
+```
+
+## 1.5. Capacidad Predictiva: Matriz de Confusión
+
+Evaluamos el rendimiento práctico del modelo comparando las predicciones con los datos reales. Para ello, convertimos las probabilidades en clasificaciones binarias usando un umbral (cut-off) de 0.5.
+
+```{r}
+### Generación de la Matriz de Confusión
+# Obtenemos las probabilidades predichas por el modelo
+predicciones_prob <- predict(logistica3, type = "response")
+
+# Clasificamos: Si prob > 0.5 entonces "SI", de lo contrario "No"
+predicciones_clase <- ifelse(predicciones_prob > 0.5, "SI", "No")
+
+# Crear la tabla de confusión
+matriz <- table(Real = binomial1$Baja, Predicho = predicciones_clase)
+print(matriz)
+
+# Cálculo de la Precisión Global (Accuracy)
+exactitud <- sum(diag(matriz)) / sum(matriz)
+print(paste("Precisión global del modelo:", round(exactitud, 4)))
+```
+
+## 1.6. Análisis de Discriminación: Curva ROC y AUC
+
+La **Curva ROC** visualiza la relación entre la sensibilidad y la especificidad. El **AUC (Área bajo la curva)** mide la capacidad del modelo para diferenciar entre las categorías de la variable `Baja`.
+
+```{r}
+### Curva ROC y cálculo del AUC
+library(pROC)
+roc_obj <- roc(binomial1$Baja, predicciones_prob)
+
+plot(roc_obj, col = "blue", main = "Curva ROC - Rendimiento del Modelo",
+     xlab = "Especificidad (1 - Falsos Positivos)", 
+     ylab = "Sensibilidad (Verdaderos Positivos)")
+
+print(paste("AUC del modelo:", round(auc(roc_obj), 4)))
+```
+
+## 1.7. Conclusiones e Interpretación Final
+
+Tras el análisis estadístico y la validación del modelo, se presentan las siguientes conclusiones:
+
+1.  **Variables Determinantes:** El modelo identifica que el **Tipo de Vehículo** (especialmente los de lujo), el **Estado Civil** y los **Ingresos** son los factores más significativos para predecir la probabilidad de `Baja`.
+2.  **Perfiles de Riesgo:**
+    *   Los propietarios de **vehículos de lujo** tienen una probabilidad significativamente mayor de registrar una "Baja" en comparación con los dueños de vehículos económicos.
+    *   Las personas con estado civil **Soltero** muestran una menor propensión al evento en comparación con el grupo de referencia.
+3.  **Desempeño del Modelo:** El modelo final presenta una buena capacidad de discriminación, con un AUC de `r round(auc(roc_obj), 3)` y una precisión global de `r round(exactitud * 100, 2)`%. 
+4.  **Optimización:** La eliminación de variables como `Direccion` y `Educacion` permitió simplificar el modelo (reduciendo el AIC) sin perder capacidad predictiva significativa, cumpliendo con el principio de parsimonia.
+
+
+
+# Ejercicio 2 :Regresiòn Logística de dataset 'multinomial.txt'
+
+Se desea estimar un modelo para predecir donde comprará un consumidor en función del resto de variables y
+determinar si son influyentes todas las variables.
+
+
+## 2.1. Análisis previos
+
+```{r}
+
+datos <-read.table("multinomial.txt",header=T,sep="\t")
+
+pander(head(datos))
+
+```
+
+Datos cargados correctamente.
+
+
+```{r}
+# Verificación de valores faltantes
+pander(colSums(is.na(datos)))
+
+```
+
+No tenemos valores NA.
+
+
+```{r}
+datos$Especialidad<-as.factor(datos$Especialidad)
+datos$sexo<-as.factor(datos$sexo)
+datos$Persona<-as.factor(datos$Persona)
+datos$Frecuencia<-as.factor(datos$Frecuencia)
+datos$Ofertas<-as.factor(datos$Ofertas)
+datos$Tipo.comercio<-as.factor(datos$Tipo.comercio)
+
+str(datos)
+```
+
+Estructura de datos preparada correctamente para la regresión logística.
+
+
+```{r}
+levels(as.factor(datos$Tipo.comercio))
+```
+
+
+Una vez elegida nuestra variable objetivo y tras comprobar cuántas categorías contiene, decidimos realizar una regresión logística multinomial.
+
+
+
+## 2.1. Regresiòn Lògistica Multinomial
+
+
+```{r, include=FALSE}
+#Regresión logística multinomial
+multi_saturo <- multinom(Tipo.comercio ~ Especialidad + sexo + Persona + 
+                  Frecuencia + Ofertas + Gasto, data = datos, model = TRUE)
+```
+
+
+```{r}
+
+summ <- summary(multi_saturo)
+coeffs <- summ$coefficients
+std_err <- summ$standard.errors
+
+z_values <- coeffs / std_err
+
+
+p_values <- (1 - pnorm(abs(z_values), 0, 1)) * 2
+
+
+odds_ratios <- exp(coeffs)
+
+
+for (i in 1:nrow(coeffs)) {
+  cat("\n--- Comparativa de la categoría:", rownames(coeffs)[i], "en comparación con la categoría 'Grande' ---\n")
+  
+  table_final <- cbind(
+    Coeficientes = coeffs[i, ],
+    Std_Error    = std_err[i, ],
+    Z_Value      = z_values[i, ],
+    P_Value      = round(p_values[i, ], 5),
+    Odds_Ratio   = odds_ratios[i, ]
+  )
+  
+  print(table_final)
+}
+
+```
+
+
+    Al verificar los valores del modelo, podemos observar cuáles son las variables más significativas y cuáles no
+    
+    
+
+- **Especialidadsin especialidad**: presenta valores muy altos y significativos en ambas categorías, lo que significa que, si una tienda no está especializada, es mucho menos probable que sea un comercio 'mediano' o 'pequeno'.
+
+Esto significa que las tiendas no especializadas tienden a ser 'grandes'.
+
+
+- **Gasto**: muy significativo para ambas categorías; el coeficiente bajo se debe a que la escala de variación de los gastos es muy pequeña (1 euro), pero si la aumentáramos, aumentaría su incidencia dada su altísima significación.
+
+
+- **Especialidad | herbolario y panadería**: significativas solo en el pequeño comercio, lo que significa que estas especializaciones aumentan drásticamente la probabilidad de que el comercio sea 'pequeno' en comparación con 'grande'.
+
+
+
+
+     Variables poco significativas
+
+
+- **sexoMujer (p=0.54 y 0.71)**: El género no influye en absoluto en la elección del tipo de comercio en esta muestra.
+
+- **Ofertas (Internet, No, publicidad)**: Ninguna de las modalidades de oferta es significativa (todas p-value > 0.40). 
+
+Las promociones no son un factor determinante a la hora de decidir si ir a una tienda grande, mediana o pequena.
+
+
+**Frecuencia (quincenal, semanal)**: La frecuencia de compra tampoco muestra una relación estadística relevante (p-value hasta 0.82).
+
+
+**Persona (la propia persona y su familia o pareja)**: Quien realiza la compra no parece cambiar el destino final de la misma.
+
+
+
+
+## 2.2. Comprobación de la significatividad del modelo y de las variables
+
+
+```{r, include=FALSE}
+multisinparametros <- multinom(datos$Tipo.comercio ~ 1, data = datos)
+```
+
+```{r}
+anova(multisinparametros,multi_saturo)
+```
+
+El valor p es inferior a 0.05, por lo que el modelo es significativo en comparación con el modelo que solo incluye la intersección.
+
+
+Veamos ahora qué variables resultan significativas.
+
+
+```{r, include=FALSE}
+#  Likelihood Ratio Tests
+
+test_esp <- lrtest(multi_saturo, "Especialidad")
+test_sex <- lrtest(multi_saturo, "sexo")
+test_per <- lrtest(multi_saturo, "Persona")
+test_fre <- lrtest(multi_saturo, "Frecuencia")
+test_ofe <- lrtest(multi_saturo, "Ofertas")
+test_gas <- lrtest(multi_saturo, "Gasto")
+```
+
+
+```{r}
+
+tabla_lr <- data.frame(
+  Variable = c("Especialidad", "Sexo", "Persona", "Frecuencia", "Ofertas", "Gasto"),
+  P_Value = c(
+    test_esp$`Pr(>Chisq)`[2],
+    test_sex$`Pr(>Chisq)`[2],
+    test_per$`Pr(>Chisq)`[2],
+    test_fre$`Pr(>Chisq)`[2],
+    test_ofe$`Pr(>Chisq)`[2],
+    test_gas$`Pr(>Chisq)`[2]
+  )
+)
+
+
+tabla_lr$Significatividad <- ifelse(tabla_lr$P_Value < 0.001, "***",
+                                     ifelse(tabla_lr$P_Value < 0.01, "**",
+                                            ifelse(tabla_lr$P_Value < 0.05, "*", "ns")))
+
+
+pander(tabla_lr, caption = "Resumen de las pruebas de razón de verosimilitud")
+
+```
+
+Solo rechazaremos la hipotesis nula para las variables Especialidad y Gasto por tanto recalculamos el modelo quitando estas variables.
+
+
+
+
+Para una última comprobación, sigamos un procedimiento por pasos --> backward stepwise
+
+
+```{r}
+multi_ottimal <- step(multi_saturo, direction = "backward", trace = 0)
+```
+
+
+Tenemos la confirmación de que las únicas variables significativas son 'Especialidad' y 'Gasto'.
+
+
+
+
+
+
+
+
+## 2.4.  Modelo más parsimonioso
+
+
+
+A la vista de los resultados obtenidos, el modelo más parsimonioso es:
+
+```{r, include=FALSE}
+multi2 <- multinom(Tipo.comercio~Especialidad+Gasto, data = datos ,model = TRUE)
+```
+
+
+Comprobemos que el nuevo modelo sea significativo.
+
+
+
+```{r}
+anova(multisinparametros,multi2)
+```
+
+Sí, tenemos la confirmación de que es significativo en comparación con el modelo que solo tiene la intersección.
+
+
+
+
+Comprobemos si el model_reducido es mejor que el model_saturado.
+
+
+```{r}
+anova(multi2, multi_saturo)
+```
+
+
+Valor p > 0.05: significa que el modelo reducido no es peor que el completo. 
+
+En otras palabras, las variables eliminadas no aportaban información relevante.
+
+
+
+Comprobemos si las dos variables siguen siendo significativas o si su significación se debía a sus relaciones con las demás.
+
+
+
+```{r,include=FALSE}
+test_esp2 <- lrtest(multi2, "Especialidad")
+test_gas2 <- lrtest(multi2, "Gasto")
+```
+
+
+```{r}
+# Estraiamo i p-value da ogni test per costruire una tabella chiara
+tabla_lr2 <- data.frame(
+   Variable = c("Especialidad", "Gasto"),
+  P_Value = c(
+    test_esp2$`Pr(>Chisq)`[2],
+    test_gas2$`Pr(>Chisq)`[2]
+  )
+)
+
+# Aggiungiamo i simboli di significatività (codici standard statistici)
+tabla_lr2$Significatividad <- ifelse(tabla_lr2$P_Value < 0.001, "***",
+                                     ifelse(tabla_lr2$P_Value < 0.01, "**",
+                                            ifelse(tabla_lr2$P_Value < 0.05, "*", "ns")))
+
+
+pander(tabla_lr2, caption = "Resumen de las pruebas de razón de verosimilitud")
+```
+
+Las variables siguen siendo muy significativas.
+
+
+
+
+
+## 2.5. Bondad del ajuste y Significatividad de la predicción
+
+
+```{r}
+pander(round(PseudoR2(multi2, which = c("CoxSnell", "Nagelkerke", "McFadden")),4))
+```
+
+Estos índices explican la mejora de la verosimilitud del modelo con respecto a un modelo nulo (sin predictores).
+
+
+Los valores de todos los índices son bastante bajos; aunque las dos variables son excelentes predictores, no explican la totalidad del comportamiento de los consumidores, por lo que puede haber otros factores que no se hayan tenido en cuenta en el análisis.
+
+
+
+```{r}
+prevision <- predict(multi2)
+
+real <- datos$Tipo.comercio
+
+
+matrix <- confusionMatrix(prevision, real)
+
+
+print(matrix)
+```
+
+
+
+A pesar de su baja precisión (52.7 %), el modelo, a través del valor p [Precisión > NIR] (6.644e-06), confirma que es estadísticamente mejor que el mero azar, por lo que es significativo.
+
+El modelo confunde a menudo 'Mediana' con 'Grande' (52 veces) y 'Mediana' con 'Pequena' (29 veces).
+
+Es muy raro que el modelo confunda una tienda Grande con una Pequeña (solo 9 veces) o viceversa (solo 10 veces).
+
+Esto significa que al modelo le cuesta distinguir los límites sutiles entre una categoría y la adyacente.
+
+La categoría más fácil de predecir es Grande, mientras que la más difícil es Pequena.
+
+
+
+
+## 2.6. Estimación e Interpretación de los parametros
+
+
+
+```{r}
+summ2 <- summary(multi2)
+coeffs2 <- summ2$coefficients
+std_err2 <- summ2$standard.errors
+
+
+z_values2 <- coeffs2 / std_err2
+
+p_values2 <- (1 - pnorm(abs(z_values2), 0, 1)) * 2
+
+# Odds Ratios
+odds_ratios2<- exp(coeffs2)
+
+
+
+for (i in 1:nrow(coeffs)) {
+  cat("\n--- Comparativa de la categoría:", rownames(coeffs)[i], "en comparación con la categoría 'Grande' ---\n")
+  
+  table_final2 <- cbind(
+    Coeficientes = coeffs2[i, ],
+    Std_Error    = std_err2[i, ],
+    Z_Value      = z_values2[i, ],
+    P_Value      = round(p_values2[i, ], 5),
+    Odds_Ratio   = odds_ratios2[i, ]
+  )
+  
+  print(table_final2)
+}
+
+```
+
+
+Analicemos solo los que son estadísticamente significativos (considerando un valor p < 0.05).
+
+-------------------------------------------------------------------------------------------------------------
+
+**Especialidad (sin especialidad) (0.3467)**: si la tienda no está especializada, la ventaja de ser 'Mediana' se reduce en un 66 % con respecto a la 'Grande'.
+
+Esto significa que la escasa especialización favorece a las tiendas 'Grandes'.
+
+Para una tienda mediana, la falta de especialización supone una enorme desventaja competitiva frente a la gran distribución.
+
+
+
+
+**Gasto (1.0029)**: a medida que aumenta el presupuesto, aumenta la preferencia por la tienda de tamano mediano frente a la gran distribución.
+
+En las tiendas medianas, el precio unitario de los productos es más alto o el cliente tiende a realizar compras más selectivas y de mayor valor.
+
+
+-------------------------------------------------------------------------------------------------------------
+
+
+
+**Intercepto (0.1053)**: indica que, en principio, es mucho menos probable elegir una tienda pequena que una grande si no intervienen otros factores.
+
+
+
+**Especialidad (herbolario) (3.3563)**: si la tienda es una herbolaria, la ventaja de que sea una tienda 'Pequena' es 3.36 veces mayor que la de ser una tienda 'Grande'.
+
+
+**Especialidad (Panadería) (3.6556)**: al igual que en el caso de la herboristería, el OR de 3.66 indica que las panaderías suelen asociarse con el comercio 'pequeno'.
+
+
+**Especialidad sin especialidad (0.1688)**: si la tienda pequena no está especializada, en comparación con la tienda  mediana, la gente se inclina más por ir a la tienda 'Grande'.
+
+
+**Gasto (1.0042)**: similar a la variable 'Gasto' comparada para las tiendas medianas. 
+
+
+
+
+## 2.6. Conclusiòn
+
+
+Las tiendas Pequenas y Medianas sobreviven gracias a la especialización; si no hay especialización, el cliente casi siempre elige la tienda grande.
+
+La variable 'Gasto' tiene un efecto positivo para ambas categorías en comparación con las 'Grandes': quienes gastan más tienden a preferir las tiendas especializadas.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
