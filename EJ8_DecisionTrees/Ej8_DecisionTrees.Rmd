@@ -1,0 +1,608 @@
+---
+title: "Ejercicios de Árboles de decisión"
+author: "Jan Żurek y Guido D'Inverno"
+date: "05/2026"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+    toc: true
+    highlight: tango
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# Configuración global de los bloques de código
+knitr::opts_chunk$set(
+  include = TRUE,    # Muestra los gráficos y las tablas 
+  echo = TRUE,       # Muestra el código en el PDF
+  warning = FALSE,   # Oculta los mensajes de advertencia
+  message = FALSE    # Oculta los mensajes de carga
+)
+
+# =======================================================
+# 1. IMPORTACIÓN Y MANIPULACIÓN DE DATOS
+# =======================================================
+library(readxl)               # Lee e importa datos desde archivos Excel (.xls y .xlsx)
+library(tidyverse)            # Colección de paquetes (ggplot2, dplyr, tidyr, etc.)
+library(dplyr)                # Manipulación rápida de conjuntos de datos (datasets)
+library(tidyr)                # Limpieza y reordenamiento de datos
+library(reshape)              # Para la manipulación y el "melt" de datos para gráficos
+library(carData)              # Conjuntos de datos de soporte para el paquete 'car'
+library(mclust)               # Conjunto de datos 'banknote' y herramientas para clustering
+library(magrittr)             # Operador pipe avanzado (%>%)
+
+# =======================================================
+# 2. ESTADÍSTICAS DESCRIPTIVAS Y EXPLORATORIAS
+# =======================================================
+library(pastecs)              # Estadísticas descriptivas (ej. función stat.desc)
+library(modeest)              # Cálculo y estimación de la moda
+library(PerformanceAnalytics) # Análisis de riesgo y matrices de correlación visuales
+library(summarytools)         # Tablas resumen y frecuencias (ej. ctable)
+
+# =======================================================
+# 3. VISUALIZACIÓN GRÁFICA
+# =======================================================
+library(graphics)             # Paquete base de R para gráficos estándar
+library(ggplot2)              # Gráficos avanzados (Grammar of Graphics)
+library(GGally)               # Extensión de ggplot2 (ej. ggpairs)
+library(patchwork)            # Combinación de múltiples gráficos ggplot2
+library(ggpubr)               # Gráficos listos para publicación
+library(vcd)                  # Visualización de datos categóricos (ej. mosaic plot)
+library(gridExtra)
+
+# =======================================================
+# 4. CORRELACIÓN Y ANÁLISIS DE REDES (NETWORKS)
+# =======================================================
+library(corrplot)             # Visualización de matrices de correlación
+library(polycor)              # Correlaciones policóricas y tetracóricas
+library(qgraph)               # Visualización de redes y modelos psicométricos
+library(igraph)               # Análisis de grafos y redes complejas
+
+# =======================================================
+# 5. PRUEBAS ESTADÍSTICAS, SUPUESTOS Y NORMALIDAD
+# =======================================================
+library(car)                  # Pruebas de supuestos, ANOVA y transformación de datos
+library(nortest)              # Pruebas de normalidad univariantes
+library(mvtnorm)              # Distribución normal multivariante
+library(MVN)                  # Pruebas de normalidad multivariante
+library(mvnormtest)           # Prueba de Shapiro-Wilk multivariante
+library(lmtest)               # Pruebas para modelos de regresión (ej. lrtest)
+library(aod)                  # Pruebas de hipótesis sobre coeficientes (ej. wald.test)
+
+# =======================================================
+# 6. MODELADO Y REGRESIÓN (LOGÍSTICA/MULTINOMIAL)
+# =======================================================
+library(nnet)                 # Regresión logística multinomial (multinom)
+library(pscl)                 # Índices Pseudo-R2 para modelos logísticos (pR2)
+library(DescTools)            # Herramientas estadísticas varias y Pseudo-R2 completos
+library(vcdExtra)             # Extensiones para datos categóricos y prueba Hosmer-Lemeshow
+library(Epi)                  # Análisis epidemiológico y curvas ROC/AUC
+library(jmv)                  # Funciones de análisis estadístico con interfaz Jamovi
+
+# =======================================================
+# 7. ANÁLISIS MULTIVARIANTE, PCA Y BIOMETRÍA
+# =======================================================
+library(psych)                # Análisis factorial (EFA), PCA y pairs.panels
+library(FactoMineR)           # Análisis multivariante exploratorio (PCA, MCA)
+library(factoextra)           # Visualización elegante de resultados de FactoMineR
+library(GPArotation)          # Algoritmos de rotación para análisis factorial
+library(nFactors)             # Índices para el número de factores/componentes
+library(paran)                # Análisis Paralelo de Horn
+library(MVA)                  # Análisis multivariante aplicado
+library(biotools)             # Biometría y prueba M de Box
+
+# =======================================================
+# 8. CLUSTERING, CLASIFICACIÓN Y MACHINE LEARNING
+# =======================================================
+library(cluster)              # Algoritmos de clustering (k-means, jerárquico)
+library(NbClust)              # Índices para el número óptimo de clústeres
+library(clValid)              # Validación de resultados de clustering
+library(dendextend)           # Personalización de dendrogramas
+library(MASS)                 # Análisis discriminante (LDA/QDA) y funciones estadísticas
+library(klaR)                 # Clasificación y visualización de particiones
+library(caret)                # Framework de Machine Learning y matrices de confusión
+library(rpart)                # Creación de árboles de decisión (particionamiento recursivo)
+library(rpart.plot)           # Visualización gráfica avanzada de árboles
+
+# =======================================================
+# 9. CREACIÓN DE REPORTES Y FORMATO DE TABLAS
+# =======================================================
+library(knitr)                # Generación de reportes dinámicos
+library(pander)               # Transforma el output de R en tablas Markdown
+```
+
+# Ejercicio 1 :Árbol de decisión de dataset 'Carseats'
+
+## 1.1. Análisis previos
+
+```{r}
+library(ISLR)
+
+Carseats <- Carseats
+pander(head(Carseats))
+
+```
+Datos cargados correctamente.
+
+
+```{r}
+# Verificación de valores faltantes
+pander(colSums(is.na(Carseats)))
+```
+
+No tenemos valores NA.
+
+
+```{r}
+Carseats$Sales[Carseats$Sales>8]<-"Altas"
+Carseats$Sales[Carseats$Sales<=8]<-"Bajas"
+Carseats$Sales<-as.factor(Carseats$Sales)
+str(Carseats)
+```
+
+
+Estructura de datos preparada correctamente para generar un modelo de clasificación.
+
+
+
+```{r}
+summary(Carseats)
+```
+
+De un breve análisis descriptivo se desprende que al menos el 25 % de las tiendas no invierte nada en advertising .
+
+En la categoría objetivo (Sales), se observa que hay muchas más bajas que altas.
+
+
+
+## 1.2 Modelo de entrenamiento pt1
+
+
+```{r}
+#  CONFIGURACIÓN DE K-FOLD CROSS VALIDATION (10 Folds)
+set.seed(12345)
+entrenamiento <- trainControl(
+  method = "cv", 
+  number = 10, 
+  classProbs = TRUE, 
+  summaryFunction = twoClassSummary, # Permite calcular AUC, Sensibilidad y Especificidad
+  savePredictions = "final",
+  verboseIter = TRUE
+)
+```
+
+
+```{r,include=FALSE}
+#Entrenamos el modelo
+modelo <- train(Sales ~ .,
+ data=Carseats,
+ method="rpart",
+ metric="ROC",
+ trControl=entrenamiento)
+```
+
+
+
+```{r}
+print(modelo)
+```
+
+
+El algoritmo ha probado tres versiones diferentes del árbol; el ganador es un modelo con cp = 0.0457.
+
+Esto se debe a que tiene una curva ROC más alta que todas las demás; 
+tenemos una buena capacidad discriminatoria, aunque podría mejorarse.
+
+La sensibilidad es buena: el modelo identifica correctamente una tienda 'Altas' el 62 % de las veces.
+
+La especificidad es excelente; prácticamente es muy bueno a la hora de determinar cuándo una tienda es 'Bajas' (el 82 % de las veces).
+
+
+
+```{r}
+# Diagrama de caja de las métricas de rendimiento (ROC, sensibilidad, especificidad) obtenidas en los 10 k-fold
+
+df_plot <- melt(modelo$resample[, c("ROC", "Sens", "Spec")])
+
+#Grafo Box-plot
+ggplot(df_plot, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot() +
+  labs(title = "Distribución de métricas (K-Fold CV)", x = "Metricas", y = "Valor") +
+  theme_minimal()
+```
+
+
+
+Tenemos un modelo muy conservador, que puede resultar útil para evitar invertir en tiendas que venderán poco (gracias a su alta especificidad).
+
+
+Una vez con el modelo realizamos el arbol de decision.
+
+```{r}
+rpart.plot(modelo$finalModel)
+```
+
+La estrategia lógica que el algoritmo ha 'aprendido' para distinguir las tiendas con ventas altas (Altas) de las que tienen ventas bajas (Bajas) es la siguiente:
+
+- En el conjunto de datos total (100 %), el 59 % de los casos presenta ventas bajas.
+
+- El árbol ha determinado que la ubicación del producto en la estantería (ShelveLocGood) es el factor determinante para el éxito de las ventas.
+
+- Si la ubicación es buena, hay un 78 % (1 - 0.22) de probabilidades de que quienes tienen ventas 'Bajas' pasen a tener ventas 'Altas'; el 21 % de las tiendas analizadas (unas 84) se encuentra en este nodo.
+
+- El 79 % restante tiene una ubicación no buena; aquí hay una distinción en función del precio:
+
+
+- **Precio < 93**: Si el precio es competitivo, el modelo sigue pronosticando ventas «Altas», aunque la ubicación en las estanterías no sea óptima. 
+
+Este grupo representa el 12 % de los datos, un 70 % que resultará en ventas 'Altas'.
+
+
+- **Precio > 93**: representa la mayoría de los casos (67 %); el 75 % de las ventas serán bajas si tenemos precios altos.
+
+
+
+El árbol nos indica que, para obtener ventas altas, hay que cumplir una de estas dos condiciones:
+
+    - Tener una ubicación excelente en el estante (ShelveLocGood).
+
+    - Si la ubicación no es óptima, mantener un precio muy agresivo (Price < 93).
+
+
+
+No se han tenido en cuenta otras variables porque, con un coeficiente de rendimiento cp = 0.0457, se ha determinado que solo la ubicación en las estanterías y el precio ofrecen un poder predictivo real, descartando el resto para evitar el riesgo de overfitting.
+
+Por lo tanto, añadir variables no habría mejorado la precisión del modelo de forma significativa sin comprometer su simplicidad.
+
+
+
+
+## 1.3 Modelo de entrenamiento pt2
+
+Intentemos mejorar la capacidad predictiva del modelo aumentando su complejidad.
+
+
+```{r}
+valoresCP <- expand.grid(cp = seq(0.01,0.05,0.01))
+
+ set.seed(12345)
+ 
+ modelo2 <- train(Sales ~ .,
+ data=Carseats,
+ method="rpart",
+ metric="ROC",
+ trControl=entrenamiento,
+ tuneGrid=valoresCP)
+ 
+```
+
+
+```{r}
+print(modelo2)
+```
+
+
+- **ROC (0.805)**: La capacidad del modelo para distinguir entre ventas altas y bajas ha mejorado significativamente, pasando de aproximadamente 0.72 a 0.80.
+
+- **Sensibilidad (0.707)**: Ahora el modelo es mucho más eficaz a la hora de identificar las tiendas con ventas altas.
+
+- **Especificidad (0.822)**: La especificidad sigue siendo muy sólida.
+
+
+
+```{r}
+#  Preparación de los datos: añadimos una columna para distinguir los modelos
+df1 <- melt(modelo$resample[, c("ROC", "Sens", "Spec")])
+df1$Modelo <- "Modelo 1 (CP 0.045)"
+
+df2 <- melt(modelo2$resample[, c("ROC", "Sens", "Spec")])
+df2$Modelo <- "Modelo 2 (CP 0.01)"
+
+#  Unión de los dos datasets
+df_confronto <- rbind(df1, df2)
+
+#  Gráfico de comparación (Box-plots enfrentados)
+ggplot(df_confronto, aes(x = variable, y = value, fill = Modelo)) +
+  geom_boxplot() +
+  labs(title = "Comparación de Rendimiento: Modelo Original vs. Optimizado",
+       subtitle = "Mejora de las métricas mediante el Tuning del CP",
+       x = "Métrica", 
+       y = "Valor") +
+  scale_fill_manual(values = c("#E41A1C", "#377EB8")) + # Rojo para el 1, Azul para el 2
+  theme_minimal()
+```
+
+Al aumentar la complejidad, hemos obtenido un modelo que no solo es  capaz de identificar quién venderá poco, sino que también se ha vuelto mucho más eficaz a la hora de detectar las tiendas que tendrán éxito.
+
+
+
+
+Albero de decision.
+
+```{r}
+#Gráfico del árbol
+ rpart.plot(modelo2$finalModel)
+```
+
+Como podemos observar, se ha vuelto mucho más complejo que antes, al añadir nuevas variables que antes no se consideraban significativas.
+
+En este momento, el árbol tiene muchas ramas que representan muy pocas tiendas, lo que lo hace más propenso al **overfitting**.
+
+
+Hagamos que el árbol sea mucho más corto y robusto, imponiendo un número mínimo de observaciones (tiendas) que deben estar presentes en cada nodo final para que la rama sea válida.
+
+
+```{r}
+#Reducimos el tamaño para facilitar la interpretación
+ arbol <- rpart(Sales ~ ., data=Carseats,
+ cp= 0.01, control = rpart.control(minbucket = 50))
+ rpart.plot(arbol)
+```
+
+En general, no ha cambiado mucho con respecto al árbol anterior. 
+
+En ambos modelos, la ubicación en la estantería (ShelveLoc = Good) es la variable más importante para predecir unas ventas elevadas.
+
+La primera parte se mantiene sin cambios; lo que varía ligeramente es el umbral de precio (de 93 a 95).
+
+Las tiendas que tienen un precio competitivo han pasado del 12 % al 14 % del total; también desciende la probabilidad de que las ventas sean 'Altas' (del 70 % al 65 %).
+
+La probabilidad de ventas 'Bajas' se ha mantenido casi idéntica (del 75 % al 76 %).
+
+
+
+```{r}
+# Reglas detalladas con cobertura y estilo en columnas
+print(rpart.rules(arbol, 
+                   style = "tall",    # Hace que las reglas sean más legibles verticalmente
+                   cover = TRUE,     # Muestra el porcentaje de datos cubiertos por cada regla
+                   nn = TRUE))       # Muestra el número del nodo correspondiente
+```
+
+
+## 1.4 Cálculo de las predicciones sobre el conjunto de datos
+
+
+```{r}
+predichos <- predict(arbol, type='class')
+confusionMatrix(predichos, Carseats$Sales)
+```
+
+El modelo ha acertado la clase correcta en aproximadamente el 75 % de los casos.
+
+El P-Value [Acc > NIR] nos confirma estadísticamente que el modelo es significativo y más útil que el caso.
+
+Al trabajar con un modelo más robusto, observamos que la sensibilidad ha disminuido: el modelo solo logra identificar el 62 % de las tiendas con ventas elevadas.
+
+En cambio, al analizar la especificidad, podemos observar que identifica correctamente el 84 % de las tiendas con ventas bajas.
+
+
+El árbol es un excelente **filtro prudente**, muy bueno para identificar qué tiendas evitarán la quiebra (alta especificidad), pero aún es un poco tímido a la hora de detectar todas las oportunidades de éxito (sensibilidad mejorable).
+
+
+Al analizar el valor p de el test de McNemar, que resulta inferior a 0.05, se observa que los errores del modelo no son aleatorios.
+
+
+Observamos que los falsos negativos (63) son casi el doble que los falsos positivos (38).
+
+
+Podemos concluir confirmando que el modelo es **"pesimista"**. 
+
+Tiende a subestimar el potencial de las tiendas, prefiriendo clasificar una tienda de éxito como "Bajas" antes que arriesgarse a calificar de "Altas" a una tienda mediocre.
+
+---
+
+# Ejercicio 2
+
+El set de datos `Boston` disponible en el paquete MASS contiene precios de viviendas de la ciudad de Boston, así como información socioeconómica del barrio en el que se encuentran. Se pretende ajustar un modelo de regresión que permita predecir el precio medio de una vivienda (`medv`) en función de las variables disponibles.
+
+## 2.1. Carga y exploración inicial de los datos
+
+El objetivo principal de este análisis es predecir el **valor mediano de las viviendas (medv)** en función de diversas variables socioeconómicas y del entorno.
+
+### Variables principales:
+*   **medv:** (Variable objetivo) Valor mediano de las casas ocupadas por sus dueños (en miles de dólares).
+*   **rm:** Número promedio de habitaciones por vivienda.
+*   **lstat:** Porcentaje de la población con un estatus socioeconómico bajo.
+*   **crim:** Tasa de criminalidad per cápita por ciudad.
+*   **age:** Proporción de unidades ocupadas por sus dueños construidas antes de 1940.
+*   **dis:** Distancias ponderadas a cinco centros de empleo de Boston.
+*   **nox:** Concentración de óxidos de nitrógeno (indicador de contaminación).
+
+En este ejercicio, utilizaremos un enfoque de **árboles de decisión** para capturar las relaciones no lineales entre estas variables y el precio de las viviendas, optimizando el modelo mediante **validación cruzada** y técnicas de **poda (pruning)** para garantizar que los resultados sean generalizables a nuevos datos.
+
+```{r}
+# Mostrar las primeras 6 filas del conjunto de datos para una inspección rápida
+head(Boston)
+
+# Verificar si existen valores ausentes (NAs) en las columnas
+# colSums suma los valores lógicos; pander le da un formato de tabla limpia al reporte
+pander(colSums(is.na(Boston)))
+
+# Visualizar la estructura del dataframe (tipo de variables, número de observaciones y dimensiones)
+str(Boston)
+
+# Generar un resumen estadístico descriptivo (mínimo, máximo, media, cuartiles) 
+# de todas las variables del dataset
+pander(summary(Boston))
+```
+
+## 2.2. Análisis Exploratorio de Datos (EDA)
+
+Antes de entrenar el modelo, es fundamental realizar un análisis exploratorio para entender las relaciones entre las variables y cómo afectan al precio de la vivienda (`medv`). A diferencia de los modelos lineales, los árboles de decisión pueden capturar relaciones no lineales y complejas, por lo que buscaremos patrones visuales y correlaciones fuertes.
+
+**Visualización de la Variable Objetivo**
+
+Primero, analizamos la distribución de los precios para ver si existen sesgos o valores atípicos.
+
+```{r}
+# Histograma del precio mediano (medv)
+ggplot(Boston, aes(x = medv)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  labs(title = "Distribución del Precio Mediano de la Vivienda",
+       x = "Precio (en miles de USD)",
+       y = "Frecuencia") +
+  theme_minimal()
+```
+
+El histograma muestra que la mayoría de las viviendas se encuentran en el rango de 15,000 a 25,000 USD. Se observa un pico inusual en los 50,000 USD, lo que sugiere que los valores podrían haber sido truncados en ese límite superior.
+
+**Análisis de Correlación**
+
+Identificamos qué variables tienen una relación más estrecha con el precio. Esto nos da una pista de qué variables aparecerán en los niveles superiores de nuestro árbol de decisión.
+
+```{r}
+# Calcular la matriz de correlación
+cor_matrix <- cor(Boston)
+
+# Visualizar la matriz
+corrplot(cor_matrix, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45, 
+         addCoef.col = "black", number.cex = 0.7)
+```
+
+La matriz de correlación indica que el precio (`medv`) tiene una fuerte correlación positiva con el número de habitaciones (`rm`) y una fuerte correlación negativa con el estatus socioeconómico bajo (`lstat`). Estas dos variables son, probablemente, los predictores más importantes para nuestro modelo.
+
+**Relación entre el Precio y Variables Clave**
+
+Visualizamos las dos variables con mayor impacto mediante diagramas de dispersión.
+
+```{r}
+# Relación con el número de habitaciones (rm)
+p1 <- ggplot(Boston, aes(x = rm, y = medv)) +
+  geom_point(alpha = 0.6, color = "darkgreen") +
+  geom_smooth(method = "loess", color = "red") +
+  labs(title = "Precio vs Número de Habitaciones",
+       x = "Habitaciones (rm)",
+       y = "Precio (medv)") +
+  theme_minimal()
+
+# Relación con el estatus socioeconómico (lstat)
+p2 <- ggplot(Boston, aes(x = lstat, y = medv)) +
+  geom_point(alpha = 0.6, color = "darkorange") +
+  geom_smooth(method = "loess", color = "red") +
+  labs(title = "Precio vs Estatus Socioeconómico",
+       x = "% Estatus Bajo (lstat)",
+       y = "Precio (medv)") +
+  theme_minimal()
+
+# library(gridExtra)
+grid.arrange(p1, p2, ncol = 2)
+```
+
+* **Habitaciones (`rm`)**: Se observa una relación lineal clara; a más habitaciones, mayor es el precio.
+
+* **Estatus (`lstat`)**: La relación es inversamente proporcional y parece ser no lineal (curva), lo cual justifica el uso de un árbol de decisión, ya que estos modelos manejan bien este tipo de curvaturas sin necesidad de transformaciones matemáticas complejas.
+
+
+
+### 2.3.1. División del conjunto de datos
+
+Para garantizar que nuestro modelo sea capaz de generalizar sus predicciones a nuevos datos, dividimos el conjunto original en dos grupos: **Entrenamiento (80%)** y **Prueba (20%)**. El modelo aprenderá los patrones de los datos de entrenamiento y, posteriormente, evaluaremos su precisión con el grupo de prueba, el cual funciona como datos "no vistos".
+
+Utilizamos la función `createDataPartition` del paquete `caret`, ya que esta realiza un muestreo estratificado, manteniendo la distribución de la variable objetivo (`medv`) en ambos subconjuntos.
+
+```{r}
+set.seed(123)
+
+# Crear el índice de partición (80% para entrenamiento)
+train_index <- createDataPartition(Boston$medv, p = 0.8, list = FALSE)
+
+# Dividir los datos
+train_data <- Boston[train_index, ]
+test_data  <- Boston[-train_index, ]
+
+# Verificar dimensiones
+cat("Registros en entrenamiento:", nrow(train_data), "\n")
+cat("Registros en prueba:", nrow(test_data), "\n")
+```
+
+### 2.3.2. Configuración de la Validación Cruzada
+
+Dentro del conjunto de entrenamiento, no basta con ajustar un solo árbol, ya que podríamos caer en el **sobreajuste (overfitting)**. Para encontrar el nivel de complejidad óptimo del árbol (la "poda" ideal), utilizaremos **Validación Cruzada de 10 pliegues (10-fold Cross-Validation)**.
+
+Este proceso divide el grupo de entrenamiento en 10 partes, entrena el modelo en 9 y lo valida en la restante, repitiendo el proceso 10 veces. Esto nos permite encontrar el **Parámetro de Complejidad (CP)** que minimiza el error de predicción.
+
+```{r}
+set.seed(2137)
+
+# Definir el esquema de entrenamiento: Validación Cruzada de 10 pliegues
+train_control <- trainControl(
+  method = "cv",       # Cross-validation
+  number = 10          # Número de pliegues (folds)
+)
+```
+
+## 2.4. Construcción del modelo
+
+En esta etapa entrenamos el árbol de regresión utilizando el paquete `caret`. El modelo busca automáticamente el **Parámetro de Complejidad (CP)** óptimo evaluando 20 valores diferentes (`tuneLength = 20`) para encontrar el nivel de poda que minimice el error (RMSE).
+
+```{r}
+# Entrenamiento del modelo con optimización de hiperparámetros
+cv_tree <- train(
+  medv ~ ., 
+  data = train_data,
+  method = "rpart", 
+  trControl = train_control,
+  tuneLength = 20,
+  metric = "RMSE"
+)
+
+# Mostrar el mejor valor de CP seleccionado
+print(cv_tree$bestTune)
+```
+
+El resultado muestra el valor de CP que optimiza el modelo. Un CP menor permite árboles más complejos, mientras que uno mayor penaliza el crecimiento para evitar el sobreajuste.
+
+## 2.5. Visualización del árbol
+
+Representamos gráficamente el árbol final optimizado. Cada nodo muestra la variable que genera la división y el precio promedio predicho (`medv`) para las viviendas en ese segmento.
+
+```{r}
+# Visualización del modelo final podado
+library(rpart.plot)
+rpart.plot(cv_tree$finalModel, 
+           main = "Árbol de Regresión Optimizado (CV)",
+           under = TRUE, 
+           faclen = 0)
+```
+
+Las variables en la parte superior del árbol (como `rm` o `lstat`) son las que tienen mayor impacto predictivo en el precio de la vivienda.
+
+```{r}
+arbol2 <- rpart(medv ~ .,
+                data=train_data,
+                cp = 0.01,
+                control = rpart.control(minbucket = 50))
+
+rpart.plot(arbol2, under = TRUE)
+```
+
+## 2.6. Evaluación del modelo (Predicción)
+
+Finalmente, evaluamos el modelo utilizando el conjunto de prueba (datos no vistos). Calculamos el **RMSE** para medir el error promedio de las predicciones y el **R-cuadrado** para determinar qué porcentaje de la variabilidad del precio logra explicar nuestro árbol.
+
+```{r}
+# Predicción con los datos de prueba
+final_predictions <- predict(cv_tree, newdata = test_data)
+final_predictions2 <- predict(arbol2, newdata = test_data)
+
+# Cálculo de métricas de rendimiento
+test_rmse <- RMSE(final_predictions, test_data$medv)
+test_r2   <- R2(final_predictions, test_data$medv)
+
+test_rmse2 <- RMSE(final_predictions2, test_data$medv)
+test_r2_2   <- R2(final_predictions2, test_data$medv)
+
+# Mostrar resultados
+cat("RMSE final en prueba:", test_rmse, "\n")
+cat("R-cuadrado final en prueba:", test_r2, "\n")
+
+# Mostrar resultados2
+cat("RMSE final en arbol mas facil:", test_rmse2, "\n")
+cat("R-cuadrado final en arbol mas facil:", test_r2_2, "\n")
+```
+
+El **RMSE** nos indica cuánto se desvía, en promedio, nuestra predicción del precio real (en miles de USD). El **R-cuadrado** muestra la precisión global; cuanto más cercano a 1, mejor es el ajuste del modelo.
+
